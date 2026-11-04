@@ -86,6 +86,10 @@ class _MainScreenState extends State<MainScreen>
   bool _requireKepalaKeluarga = false;
   bool _isProcessingKk = false;
 
+  File? _suratSehatImage;
+  SuratSehatValidationResult? _suratSehatValidationResult;
+  bool _isProcessingSuratSehat = false;
+
   File? _passportImage;
   PassportModel? _passportModel;
   bool _isProcessingPassport = false;
@@ -93,7 +97,7 @@ class _MainScreenState extends State<MainScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -165,6 +169,17 @@ class _MainScreenState extends State<MainScreen>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        Icon(Icons.medical_services_outlined, size: 17),
+                        SizedBox(width: 6),
+                        Text('Surat Sehat'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    iconMargin: EdgeInsets.zero,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
                         Icon(Icons.flight_takeoff_rounded, size: 17),
                         SizedBox(width: 6),
                         Text('Passport'),
@@ -182,6 +197,7 @@ class _MainScreenState extends State<MainScreen>
         children: [
           _buildKtpTab(),
           _buildKkTab(),
+          _buildSuratSehatTab(),
           _buildPassportTab(),
         ],
       ),
@@ -228,6 +244,24 @@ class _MainScreenState extends State<MainScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFD990F),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.document_scanner_rounded),
+                  label: const Text(
+                    'Smart Document Camera (Figma UI)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => _openSmartDocumentCamera(SmartDocumentType.ktp),
+                ),
+                const SizedBox(height: 8),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
@@ -486,6 +520,24 @@ class _MainScreenState extends State<MainScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFD990F),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.document_scanner_rounded),
+                  label: const Text(
+                    'Buka Kamera KK (Sesuai Figma)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => _openSmartDocumentCamera(SmartDocumentType.kartuKeluarga),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -532,6 +584,117 @@ class _MainScreenState extends State<MainScreen>
         if (!_isProcessingKk && _kkValidationResult != null) ...[
           const SizedBox(height: 16),
           _buildKkResult(),
+        ],
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildSuratSehatTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (_suratSehatImage != null) ...[
+          _buildImagePreview(
+            imageFile: _suratSehatImage!,
+            onClear: () {
+              setState(() {
+                _suratSehatImage = null;
+                _suratSehatValidationResult = null;
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.medical_services_rounded,
+                        color: Color(0xFFFD990F), size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Pindai Surat Keterangan Sehat (Figma UI)',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFD990F),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.document_scanner_rounded),
+                  label: const Text(
+                    'Buka Kamera Surat Sehat (Sesuai Figma)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () =>
+                      _openSmartDocumentCamera(SmartDocumentType.suratSehat),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.photo_library_rounded, size: 18),
+                        label: const Text('Galeri'),
+                        onPressed: () =>
+                            _getImage(ImageSource.gallery, 'suratSehat'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                        label: const Text('Kamera'),
+                        onPressed: () =>
+                            _getImage(ImageSource.camera, 'suratSehat'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_isProcessingSuratSehat)
+          _buildLoadingIndicator('Memvalidasi Surat Keterangan Sehat...'),
+        if (!_isProcessingSuratSehat && _suratSehatValidationResult != null) ...[
+          const SizedBox(height: 16),
+          _buildSuratSehatResult(),
         ],
         const SizedBox(height: 32),
       ],
@@ -1190,6 +1353,162 @@ class _MainScreenState extends State<MainScreen>
     );
   }
 
+  Widget _buildSuratSehatResult() {
+    final result = _suratSehatValidationResult!;
+    final isValid = result.isValid;
+    final model = result.model;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isValid ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isValid ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                isValid ? Icons.check_circle_rounded : Icons.cancel_outlined,
+                color: isValid ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isValid
+                          ? 'DOKUMEN VALID SURAT KETERANGAN SEHAT'
+                          : 'BUKAN SURAT SEHAT / TIDAK VALID',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isValid ? const Color(0xFF047857) : const Color(0xFFB91C1C),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tingkat Keyakinan: ${(result.confidence * 100).toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    if (model?.nama != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Nama Pasien: ${model?.nama}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (result.missingRequirements.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        color: Color(0xFFD97706), size: 18),
+                    SizedBox(width: 6),
+                    Text(
+                      'Kriteria yang belum terpenuhi:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                for (final item in result.missingRequirements)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 2),
+                    child: Text(
+                      '• $item',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF78350F),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+        if (model != null) ...[
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.health_and_safety_rounded,
+                          color: Color(0xFFFD990F), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Data Hasil Pemeriksaan Kesehatan',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(color: Color(0xFFE2E8F0)),
+                  _buildDetailRow('Fasilitas Kesehatan', model.namaFaskes, isBold: true),
+                  _buildDetailRow('Nama Pasien', model.nama, isBold: true),
+                  _buildDetailRow('NIK', model.nik),
+                  _buildDetailRow('Umur', model.umur),
+                  _buildDetailRow('Jenis Kelamin', model.jenisKelamin),
+                  _buildDetailRow('Alamat', model.alamat),
+                  _buildDetailRow('Tinggi Badan', model.tinggiBadan),
+                  _buildDetailRow('Berat Badan', model.beratBadan),
+                  _buildDetailRow('Tekanan Darah (Tensi)', model.tekananDarah),
+                  _buildDetailRow('Golongan Darah', model.golonganDarah),
+                  _buildDetailRow('Buta Warna', model.butaWarna),
+                  _buildDetailRow('Kesimpulan', model.kesimpulan, isBold: true),
+                  _buildDetailRow('Dokter Pemeriksa', model.namaDokter),
+                  _buildDetailRow('SIP / NIP Dokter', model.nomorSip),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildPassportResult() {
     final model = _passportModel!;
 
@@ -1332,6 +1651,44 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
+  Future<void> _openSmartDocumentCamera(SmartDocumentType type) async {
+    final SmartDocumentResult? result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SmartDocumentCameraScreen(
+          documentType: type,
+          showSubmitButton: true,
+          enableGallery: true,
+          kkOptions: KartuKeluargaValidationOptions(
+            requireNomorKk: _requireNomorKk,
+            requireHeader: _requireHeader,
+            requireKepalaKeluarga: _requireKepalaKeluarga,
+          ),
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        switch (type) {
+          case SmartDocumentType.ktp:
+            _ktpImage = result.imageFile;
+            _ktpPhoto = result.ktpPhotoFile;
+            _ktpModel = result.ktpModel;
+            break;
+          case SmartDocumentType.kartuKeluarga:
+            _kkImage = result.imageFile;
+            _kkValidationResult = result.kkValidation;
+            break;
+          case SmartDocumentType.suratSehat:
+            _suratSehatImage = result.imageFile;
+            _suratSehatValidationResult = result.suratSehatValidation;
+            break;
+        }
+      });
+    }
+  }
+
   Future<void> _getImage(ImageSource source, String documentType) async {
     if (documentType == 'ktp') {
       setState(() {
@@ -1344,6 +1701,12 @@ class _MainScreenState extends State<MainScreen>
         _kkImage = null;
         _kkValidationResult = null;
         _isProcessingKk = true;
+      });
+    } else if (documentType == 'suratSehat') {
+      setState(() {
+        _suratSehatImage = null;
+        _suratSehatValidationResult = null;
+        _isProcessingSuratSehat = true;
       });
     } else {
       setState(() {
@@ -1365,6 +1728,7 @@ class _MainScreenState extends State<MainScreen>
       setState(() {
         _isProcessingKtp = false;
         _isProcessingKk = false;
+        _isProcessingSuratSehat = false;
         _isProcessingPassport = false;
       });
     }
@@ -1519,6 +1883,12 @@ class _MainScreenState extends State<MainScreen>
         options: options,
       );
       _isProcessingKk = false;
+    } else if (documentType == 'suratSehat') {
+      _suratSehatImage = originalFile;
+      _suratSehatValidationResult = await KtpExtractor.validateSuratSehat(
+        originalFile,
+      );
+      _isProcessingSuratSehat = false;
     } else {
       final cropped = await KtpExtractor.cropImageForPassport(originalFile);
       PassportModel model =

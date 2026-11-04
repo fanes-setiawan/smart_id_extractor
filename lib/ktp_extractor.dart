@@ -12,14 +12,23 @@ import 'models/kartu_keluarga_model.dart';
 import 'models/kartu_keluarga_validation.dart';
 import 'models/ktp_model.dart';
 import 'models/passport_model.dart';
+import 'models/surat_sehat_model.dart';
+import 'models/surat_sehat_validation.dart';
 import 'utils/kk_extractor_helper.dart';
+import 'utils/surat_sehat_extractor_helper.dart';
 
 export 'models/kartu_keluarga_model.dart';
 export 'models/kartu_keluarga_validation.dart';
 export 'models/ktp_camera_result.dart';
 export 'models/ktp_model.dart';
 export 'models/passport_model.dart';
+export 'models/smart_document_type.dart';
+export 'models/surat_sehat_model.dart';
+export 'models/surat_sehat_validation.dart';
 export 'ui/ktp_camera_screen.dart';
+export 'ui/smart_document_camera_screen.dart';
+export 'ui/smart_document_stepper_header.dart';
+export 'ui/smart_document_watermark_painter.dart';
 
 /// A utility class for extracting information from KTP (Indonesian ID card) and Passport images.
 class KtpExtractor {
@@ -1152,6 +1161,72 @@ class KtpExtractor {
       ),
     );
     return validation.data ?? const KartuKeluargaModel();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Surat Keterangan Sehat / Dokter Verification & Extraction
+  // ---------------------------------------------------------------------------
+
+  /// Validates an image against authentic Indonesian Surat Keterangan Sehat/Dokter criteria.
+  static Future<SuratSehatValidationResult> validateSuratSehat(
+    File imageFile, {
+    SuratSehatValidationOptions options = const SuratSehatValidationOptions(),
+  }) async {
+    final TextRecognizer recognizer = TextRecognizer();
+    try {
+      final InputImage inputImage = InputImage.fromFile(imageFile);
+      final RecognizedText recognizedText =
+          await recognizer.processImage(inputImage);
+
+      return SuratSehatExtractorHelper.validateFromText(
+        recognizedText.text,
+        options: options,
+        recognizedText: recognizedText,
+      );
+    } finally {
+      await recognizer.close();
+    }
+  }
+
+  /// Validates whether raw OCR text represents an authentic Surat Keterangan Sehat.
+  static SuratSehatValidationResult validateSuratSehatFromText(
+    String rawText, {
+    SuratSehatValidationOptions options = const SuratSehatValidationOptions(),
+  }) {
+    return SuratSehatExtractorHelper.validateFromText(rawText, options: options);
+  }
+
+  /// Convenience boolean check to quickly verify if an image is a Surat Keterangan Sehat.
+  static Future<bool> isSuratSehat(
+    File imageFile, {
+    bool requireHeader = true,
+    int minKeywordMatches = 2,
+  }) async {
+    final result = await validateSuratSehat(
+      imageFile,
+      options: SuratSehatValidationOptions(
+        requireHeader: requireHeader,
+        minKeywordMatches: minKeywordMatches,
+      ),
+    );
+    return result.isValid;
+  }
+
+  /// Extracts structured data from a Surat Keterangan Sehat image.
+  static Future<SuratSehatModel> extractSuratSehat(File imageFile) async {
+    final validation = await validateSuratSehat(
+      imageFile,
+      options: const SuratSehatValidationOptions(
+        requireHeader: false,
+        minKeywordMatches: 1,
+      ),
+    );
+    return validation.data ?? const SuratSehatModel();
+  }
+
+  /// Extracts structured data from raw Surat Keterangan Sehat OCR text.
+  static SuratSehatModel extractSuratSehatFromText(String rawText) {
+    return SuratSehatExtractorHelper.parseFromText(rawText);
   }
 }
 

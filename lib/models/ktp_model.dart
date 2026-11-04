@@ -18,6 +18,7 @@ class KtpModel extends Equatable {
   final String? occupation;
   final String? nationality;
   final String? validUntil;
+  final String? rawText;
 
   const KtpModel({
     this.nik,
@@ -37,6 +38,7 @@ class KtpModel extends Equatable {
     this.occupation,
     this.nationality,
     this.validUntil,
+    this.rawText,
   });
 
   @override
@@ -58,5 +60,6 @@ class KtpModel extends Equatable {
         occupation,
         nationality,
         validUntil,
+        rawText,
       ];
 }
