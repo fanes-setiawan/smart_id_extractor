@@ -328,6 +328,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       setState(() {
         _isProcessing = false;
         _latestResult = result;
+        // Update viewfinder image to the cropped document so user sees the clean crop preview
+        _capturedImageFile = result.imageFile;
       });
 
       // If submit button is hidden, immediately return result to caller
