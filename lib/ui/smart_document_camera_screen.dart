@@ -103,6 +103,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
 
   File? _capturedImageFile;
   SmartDocumentResult? _latestResult;
+  bool _isGuidanceExpanded = false;
 
   late AnimationController _laserAnimationController;
   late Animation<double> _laserAnimation;
@@ -489,44 +490,68 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
             fit: StackFit.expand,
             children: [
               SafeArea(
-                child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  padding: EdgeInsets.only(bottom: 16.h),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // 1. Top Header Bar: Back Chevron + Title
-                      _buildTopBar(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 1. Top Header Bar: Back Chevron + Title
+                    _buildTopBar(),
 
-                      // 2. Stepper Header ("TAHAPAN BERKAS", 3 Bars, 3 Steps)
-                      if (widget.showStepper)
-                        SmartDocumentStepperHeader(
-                          activeType: widget.documentType,
-                          currentStep: widget.currentStep,
-                          completedSteps: widget.completedSteps,
+                    // 2. Stepper Header ("TAHAPAN BERKAS", 3 Bars, 3 Steps)
+                    if (widget.showStepper)
+                      SmartDocumentStepperHeader(
+                        activeType: widget.documentType,
+                        currentStep: widget.currentStep,
+                        completedSteps: widget.completedSteps,
+                      ),
+
+                    // Scrollable middle section: Viewfinder & Panduan
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        padding: EdgeInsets.symmetric(vertical: 4.h),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SizedBox(height: 4.h),
+                            // 3. Viewfinder Container (Camera Preview + Watermark Overlay)
+                            _buildViewfinder(),
+
+                            SizedBox(height: 10.h),
+
+                            // 4. Panduan Pemindaian Card (dengan "Lanjutkan membaca...")
+                            _buildGuidanceCard(),
+
+                            SizedBox(height: 8.h),
+                          ],
                         ),
+                      ),
+                    ),
 
-                      SizedBox(height: 8.h),
-
-                      // 3. Viewfinder Container (Camera Preview + Watermark Overlay)
-                      _buildViewfinder(),
-
-                      SizedBox(height: 12.h),
-
-                      // 4. Panduan Pemindaian Card
-                      _buildGuidanceCard(),
-
-                      SizedBox(height: 14.h),
-
-                      // 5. Shutter Row & Gallery Button
-                      _buildShutterRow(),
-
-                      SizedBox(height: 14.h),
-
-                      // 6. Bottom Submit Button ("Kirim" / "Kirim & Selesaikan Verifikasi")
-                      if (widget.showSubmitButton) _buildSubmitButton(),
-                    ],
-                  ),
+                    // 5. Fixed Bottom Section: Shutter Row & Optional Submit Button
+                    Container(
+                      padding: EdgeInsets.only(top: 8.h, bottom: 12.h),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9F9FF),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF002245).withOpacity(0.04),
+                            blurRadius: 10.r,
+                            offset: Offset(0, -3.h),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildShutterRow(),
+                          if (widget.showSubmitButton) ...[
+                            SizedBox(height: 10.h),
+                            _buildSubmitButton(),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -810,11 +835,14 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   Widget _buildGuidanceCard() {
     final title = widget.guidanceTitle ?? widget.documentType.guidanceTitle;
     final tips = widget.guidanceTips ?? widget.documentType.guidanceTips;
+    final bool hasManyTips = tips.length > 2;
+    final displayedTips =
+        (!_isGuidanceExpanded && hasManyTips) ? tips.take(2).toList() : tips;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20.w),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18.r),
@@ -822,6 +850,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Card Title Header
             Row(
@@ -829,34 +858,36 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                 SvgPicture.asset(
                   'assets/icons/ic_lamp.svg',
                   package: 'smart_id_extractor',
-                  width: 18.r,
-                  height: 18.r,
+                  width: 17.r,
+                  height: 17.r,
                 ),
                 SizedBox(width: 8.w),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontFamily: 'PlusJakartaSans',
-                    color: const Color(0xFF002245),
-                    fontSize: 13.5.sp,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'PlusJakartaSans',
+                      color: const Color(0xFF002245),
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 10.h),
+            SizedBox(height: 8.h),
 
             // Tip Bullet Points
-            for (final tip in tips)
+            for (final tip in displayedTips)
               Padding(
-                padding: EdgeInsets.only(bottom: 8.h),
+                padding: EdgeInsets.only(bottom: 6.h),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       width: 5.r,
                       height: 5.r,
-                      margin: EdgeInsets.only(top: 6.h, right: 9.w),
+                      margin: EdgeInsets.only(top: 5.h, right: 8.w),
                       decoration: const BoxDecoration(
                         color: Color(0xFFFD990F),
                         shape: BoxShape.circle,
@@ -868,13 +899,50 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                         style: TextStyle(
                           fontFamily: 'PlusJakartaSans',
                           color: const Color(0xFF43474F),
-                          fontSize: 11.5.sp,
-                          height: 1.35,
+                          fontSize: 11.sp,
+                          height: 1.3,
                           fontWeight: FontWeight.w400,
                         ),
                       ),
                     ),
                   ],
+                ),
+              ),
+
+            // "Lanjutkan membaca" / "Ciutkan" text toggle
+            if (hasManyTips)
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isGuidanceExpanded = !_isGuidanceExpanded;
+                  });
+                },
+                child: Padding(
+                  padding: EdgeInsets.only(top: 2.h),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _isGuidanceExpanded
+                            ? 'Sembunyikan panduan'
+                            : 'Lanjutkan membaca...',
+                        style: TextStyle(
+                          fontFamily: 'PlusJakartaSans',
+                          color: const Color(0xFFFD990F),
+                          fontSize: 11.5.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(width: 4.w),
+                      Icon(
+                        _isGuidanceExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        color: const Color(0xFFFD990F),
+                        size: 16.sp,
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],
