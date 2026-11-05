@@ -69,8 +69,6 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
 
   bool _isCapturing = false;
   bool _isDisposed = false;
-  late bool _isAutoMode;
-  String _statusMessage = 'Posisikan KTP di dalam bingkai';
   File? _capturedFreezeFile;
 
   late AnimationController _laserAnimationController;
@@ -79,7 +77,6 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
   @override
   void initState() {
     super.initState();
-    _isAutoMode = widget.autoCapture;
     WidgetsBinding.instance.addObserver(this);
 
     _laserAnimationController = AnimationController(
@@ -131,11 +128,6 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
     try {
       _cameras = await availableCameras();
       if (_cameras.isEmpty) {
-        if (mounted && !_isDisposed) {
-          setState(() {
-            _statusMessage = 'Kamera tidak ditemukan';
-          });
-        }
         return;
       }
 
@@ -150,11 +142,7 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
 
       await _startLiveCamera(_cameras[_cameraIndex]);
     } catch (e) {
-      if (mounted && !_isDisposed) {
-        setState(() {
-          _statusMessage = 'Gagal mengakses kamera: $e';
-        });
-      }
+      // Ignored
     } finally {
       _isInitializingCamera = false;
     }
@@ -210,11 +198,7 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
 
       setState(() {});
     } catch (e) {
-      if (mounted && !_isDisposed) {
-        setState(() {
-          _statusMessage = 'Inisialisasi kamera gagal: $e';
-        });
-      }
+      // Ignored
     }
   }
 
@@ -239,10 +223,7 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
     HapticFeedback.heavyImpact();
 
     if (mounted) {
-      setState(() {
-        _statusMessage =
-            isAuto ? 'KTP terverifikasi! Memproses...' : 'Mengambil gambar...';
-      });
+      setState(() {});
     }
 
     try {
@@ -271,7 +252,6 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
       if (mounted) {
         setState(() {
           _capturedFreezeFile = originalFile;
-          _statusMessage = 'Mengekstrak data KTP...';
         });
       }
 
@@ -316,7 +296,6 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
       if (mounted && !_isDisposed) {
         setState(() {
           _isCapturing = false;
-          _statusMessage = 'Gagal memproses KTP: $e';
         });
         if (widget.autoCapture &&
             _controller != null &&
@@ -350,9 +329,6 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
         if (mounted && !_isDisposed) {
           setState(() {
             _isCapturing = false;
-            _statusMessage = _isAutoMode
-                ? 'Posisikan KTP di dalam bingkai'
-                : 'Arahkan KTP ke bingkai lalu foto';
           });
         }
         // If camera was disposed while gallery was open, reinitialize it
@@ -369,9 +345,7 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
       HapticFeedback.mediumImpact();
 
       if (mounted) {
-        setState(() {
-          _statusMessage = 'Mengekstrak Data KTP dari Galeri...';
-        });
+        setState(() {});
       }
 
       final File originalFile = File(pickedFile.path);
@@ -407,7 +381,6 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
       if (mounted && !_isDisposed) {
         setState(() {
           _isCapturing = false;
-          _statusMessage = 'Gagal memproses KTP dari galeri: $e';
         });
         if (widget.autoCapture &&
             _controller != null &&
@@ -925,39 +898,41 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
                 ),
               ),
 
-              // 7. Processing Loading Screen
+              // 7. Processing Loading Screen (Simpel: Circle loading dibungkus container)
               if (_isCapturing)
                 Container(
-                  color: Colors.black.withOpacity(0.50),
+                  color: Colors.black.withOpacity(0.35),
                   child: Center(
                     child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 24.w,
-                        vertical: 20.h,
-                      ),
+                      width: 68.r,
+                      height: 68.r,
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16.r),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Color(0xFFF59E0B),
-                            ),
-                            strokeWidth: 3.0,
-                          ),
-                          SizedBox(height: 16.h),
-                          Text(
-                            _statusMessage,
-                            style: TextStyle(
-                              color: const Color(0xFF0F172A),
-                              fontSize: 13.5.sp,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.12),
+                            blurRadius: 16.r,
+                            offset: Offset(0, 4.h),
                           ),
                         ],
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 32.r,
+                              height: 32.r,
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  widget.loadingColor,
+                                ),
+                                strokeWidth: 3.2,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

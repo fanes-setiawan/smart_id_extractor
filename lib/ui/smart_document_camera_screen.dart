@@ -100,7 +100,6 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   bool _isInitializingCamera = false;
   bool _isProcessing = false;
   bool _isDisposed = false;
-  String _statusMessage = '';
 
   File? _capturedImageFile;
   SmartDocumentResult? _latestResult;
@@ -136,11 +135,6 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
     try {
       _cameras = await availableCameras();
       if (_cameras.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _statusMessage = 'Kamera tidak ditemukan pada perangkat ini.';
-          });
-        }
         return;
       }
 
@@ -150,11 +144,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       if (selectedIdx == -1) selectedIdx = 0;
       await _startCameraController(selectedIdx);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _statusMessage = 'Gagal menginisialisasi kamera: $e';
-        });
-      }
+      // Ignored
     } finally {
       _isInitializingCamera = false;
     }
@@ -193,11 +183,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _statusMessage = 'Gagal memulai kamera: $e';
-        });
-      }
+      // Ignored
     }
   }
 
@@ -254,7 +240,6 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
     try {
       setState(() {
         _isProcessing = true;
-        _statusMessage = 'Mengambil gambar & memindai berkas...';
       });
 
       final XFile xFile = await _controller!.takePicture();
@@ -271,7 +256,6 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       if (mounted) {
         setState(() {
           _isProcessing = false;
-          _statusMessage = 'Gagal mengambil gambar: $e';
         });
       }
     }
@@ -292,7 +276,6 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
         setState(() {
           _capturedImageFile = imageFile;
           _isProcessing = true;
-          _statusMessage = 'Memproses berkas dari galeri...';
         });
       }
 
@@ -301,7 +284,6 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       if (mounted) {
         setState(() {
           _isProcessing = false;
-          _statusMessage = 'Gagal memilih berkas dari galeri: $e';
         });
       }
     }
@@ -351,7 +333,6 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       if (mounted) {
         setState(() {
           _isProcessing = false;
-          _statusMessage = 'Gagal memproses dokumen: $e';
         });
       }
     }
@@ -514,7 +495,6 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
     setState(() {
       _capturedImageFile = null;
       _latestResult = null;
-      _statusMessage = '';
     });
   }
 
@@ -601,36 +581,34 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                 ),
               ),
 
-              // 7. Processing Overlay Spinner
+              // 7. Processing Overlay Spinner (Simpel: Circle loading dibungkus container)
               if (_isProcessing)
                 Container(
-                  color: Colors.black.withOpacity(0.55),
+                  color: Colors.black.withOpacity(0.35),
                   child: Center(
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 28.w, vertical: 22.h),
+                      width: 68.r,
+                      height: 68.r,
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16.r),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(widget.accentColor),
-                            strokeWidth: 3.0,
-                          ),
-                          SizedBox(height: 14.h),
-                          Text(
-                            _statusMessage.isNotEmpty ? _statusMessage : 'Memverifikasi dokumen...',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontFamily: 'PlusJakartaSans',
-                              color: const Color(0xFF002245),
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.12),
+                            blurRadius: 16.r,
+                            offset: Offset(0, 4.h),
                           ),
                         ],
+                      ),
+                      child: Center(
+                        child: SizedBox(
+                          width: 32.r,
+                          height: 32.r,
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(widget.accentColor),
+                            strokeWidth: 3.2,
+                          ),
+                        ),
                       ),
                     ),
                   ),
