@@ -707,23 +707,24 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                       ),
 
                     // 2. Custom Watermark & Corners Painter
-                    IgnorePointer(
-                      child: AnimatedBuilder(
-                        animation: _laserAnimation,
-                        builder: (context, child) {
-                          return CustomPaint(
-                            size: Size(cardWidth, cardHeight),
-                            painter: SmartDocumentWatermarkPainter(
-                              documentType: widget.documentType,
-                              laserProgress: _laserAnimation.value,
-                              showWatermark: !isCameraActive || _capturedImageFile != null,
-                              showLaser: isCameraActive && _capturedImageFile == null,
-                              cornerRadius: 20.r,
-                            ),
-                          );
-                        },
+                    if (_capturedImageFile == null)
+                      IgnorePointer(
+                        child: AnimatedBuilder(
+                          animation: _laserAnimation,
+                          builder: (context, child) {
+                            return CustomPaint(
+                              size: Size(cardWidth, cardHeight),
+                              painter: SmartDocumentWatermarkPainter(
+                                documentType: widget.documentType,
+                                laserProgress: _laserAnimation.value,
+                                showWatermark: !isCameraActive,
+                                showLaser: isCameraActive,
+                                cornerRadius: 20.r,
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ),
 
                     // 3. Top-Right Quick Camera Actions (Flash & Lens Switch)
                     if (isCameraActive && _capturedImageFile == null)
