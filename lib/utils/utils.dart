@@ -364,7 +364,25 @@ CardCorners? detectFlexibleKtpCorners(
   final double cosT = cos(rad);
   final double sinT = sin(rad);
 
-  // 2. Project points into card coordinate space (u, v) in display space
+  // 2. Locate NIK or primary identity anchor in display space to anchor single card detection
+  double? nikV;
+  double? nikU;
+  for (final block in recognized.blocks) {
+    for (final line in block.lines) {
+      final lineDigits = line.text.filterNumbersOnly();
+      final upper = line.text.toUpperCase();
+      if (lineDigits.length == 16 || upper.contains('NIK')) {
+        final r = line.boundingBox;
+        final centerPt = transformOffset(Offset(r.left + r.width / 2, r.top + r.height / 2));
+        nikU = centerPt.dx * cosT + centerPt.dy * sinT;
+        nikV = -centerPt.dx * sinT + centerPt.dy * cosT;
+        break;
+      }
+    }
+    if (nikV != null) break;
+  }
+
+  // 3. Project points into card coordinate space (u, v) in display space
   double minU = double.infinity;
   double maxU = double.negativeInfinity;
   double minV = double.infinity;
@@ -374,6 +392,27 @@ CardCorners? detectFlexibleKtpCorners(
 
   for (final block in recognized.blocks) {
     final blockText = block.text.toUpperCase();
+
+    // Reject blocks from back of KTP
+    if (blockText.contains('KARTU TANDA PENDUDUK') && !blockText.contains('NIK')) {
+      continue;
+    }
+
+    // If NIK is detected, filter out blocks from other cards outside the front card's vertical span
+    if (nikV != null && nikU != null) {
+      final r = block.boundingBox;
+      final centerPt = transformOffset(Offset(r.left + r.width / 2, r.top + r.height / 2));
+      final double cu = centerPt.dx * cosT + centerPt.dy * sinT;
+      final double cv = -centerPt.dx * sinT + centerPt.dy * cosT;
+      final double vDiff = cv - nikV;
+      if (vDiff < -220 || vDiff > 320) {
+        continue;
+      }
+      if ((cu - nikU).abs() > 800) {
+        continue;
+      }
+    }
+
     bool isRelevant = false;
     for (final kw in ktpKeywords) {
       if (blockText.contains(kw)) {
@@ -424,17 +463,22 @@ CardCorners? detectFlexibleKtpCorners(
     return null;
   }
 
-  // Include nearby signature / photo text
+  // Include nearby signature / photo text strictly within single card boundary
   for (final block in recognized.blocks) {
+    final blockText = block.text.toUpperCase();
+    if (blockText.contains('KARTU TANDA PENDUDUK') && !blockText.contains('NIK')) {
+      continue;
+    }
+
     final r = block.boundingBox;
     final centerPt =
         transformOffset(Offset(r.left + r.width / 2, r.top + r.height / 2));
     final double cu = centerPt.dx * cosT + centerPt.dy * sinT;
     final double cv = -centerPt.dx * sinT + centerPt.dy * cosT;
-    if (cv >= minV - 40 &&
-        cv <= maxV + 60 &&
-        cu >= minU - 50 &&
-        cu <= maxU + 280) {
+    if (cv >= minV - 25 &&
+        cv <= maxV + 35 &&
+        cu >= minU - 40 &&
+        cu <= maxU + 260) {
       for (final line in block.lines) {
         for (final p in line.cornerPoints) {
           final pt = transformPoint(p);

@@ -158,7 +158,29 @@ class KtpExtractor {
         final double cosT = cos(rad);
         final double sinT = sin(rad);
 
-        // 2. Project relevant text into the card's rotated frame (u, v)
+        // 2. Locate the primary KTP front card anchor (NIK or primary identity keywords)
+        // This ensures that if the image contains both front and back cards, or multiple documents,
+        // we only crop the FRONT card containing NIK and profile photo.
+        TextLine? nikLine;
+        double? nikV;
+        double? nikU;
+
+        for (final block in recognizedText.blocks) {
+          for (final line in block.lines) {
+            final lineDigits = line.text.filterNumbersOnly();
+            final upperLine = line.text.toUpperCase();
+            if (lineDigits.length == 16 || upperLine.contains('NIK')) {
+              nikLine = line;
+              final r = line.boundingBox;
+              nikU = (r.left + r.width / 2) * cosT + (r.top + r.height / 2) * sinT;
+              nikV = -(r.left + r.width / 2) * sinT + (r.top + r.height / 2) * cosT;
+              break;
+            }
+          }
+          if (nikLine != null) break;
+        }
+
+        // 3. Project relevant front-card text into the card's rotated frame (u, v)
         // u = along text line (width), v = perpendicular to text line (height)
         double minU = double.infinity;
         double maxU = double.negativeInfinity;
@@ -174,10 +196,54 @@ class KtpExtractor {
           if (v > maxV) maxV = v;
         }
 
+        // Front-card specific keywords (exclude back card texts like "KARTU TANDA PENDUDUK")
+        const List<String> frontCardExclusiveKeywords = [
+          'NIK',
+          'PROVINSI',
+          'KABUPATEN',
+          'KOTA',
+          'AGAMA',
+          'STATUS',
+          'PERKAWINAN',
+          'TEMPAT',
+          'LAHIR',
+          'ALAMAT',
+          'ISLAM',
+          'KRISTEN',
+          'KATHOLIK',
+          'HINDU',
+          'BUDDHA',
+          'PEKERJAAN',
+          'BERLAKU',
+          'SEUMUR',
+        ];
+
         for (final block in recognizedText.blocks) {
           final blockText = block.text.toUpperCase();
+
+          // Reject blocks from back card
+          if (blockText.contains('KARTU TANDA PENDUDUK') && !blockText.contains('NIK')) {
+            continue;
+          }
+
+          // If NIK anchor was detected, enforce vertical proximity to the front card
+          if (nikV != null && nikU != null) {
+            final r = block.boundingBox;
+            final double cv = -(r.left + r.width / 2) * sinT + (r.top + r.height / 2) * cosT;
+            final double cu = (r.left + r.width / 2) * cosT + (r.top + r.height / 2) * sinT;
+            // On a standard KTP, header is at most ~160px above NIK, footer is at most ~320px below NIK
+            // Anything significantly below NIK + 350 is part of another card/page (e.g. back card)
+            final double vDiff = cv - nikV;
+            if (vDiff < -220 || vDiff > 320) {
+              continue;
+            }
+            if ((cu - nikU).abs() > 800) {
+              continue;
+            }
+          }
+
           bool isRelevant = false;
-          for (final kw in ktpKeywords) {
+          for (final kw in frontCardExclusiveKeywords) {
             if (blockText.contains(kw)) {
               isRelevant = true;
               break;
@@ -210,17 +276,22 @@ class KtpExtractor {
         }
 
         if (minU < maxU && minV < maxV) {
-          // Include nearby text (e.g. signature, date) within the card area in (u, v) space
+          // Include nearby text (e.g. signature, date) strictly within the single front card area in (u, v) space
           for (final block in recognizedText.blocks) {
+            final blockText = block.text.toUpperCase();
+            if (blockText.contains('KARTU TANDA PENDUDUK') && !blockText.contains('NIK')) {
+              continue;
+            }
+
             final r = block.boundingBox;
             final double cu =
                 (r.left + r.width / 2) * cosT + (r.top + r.height / 2) * sinT;
             final double cv =
                 -(r.left + r.width / 2) * sinT + (r.top + r.height / 2) * cosT;
-            if (cv >= minV - 40 &&
-                cv <= maxV + 60 &&
-                cu >= minU - 60 &&
-                cu <= maxU + 350) {
+            if (cv >= minV - 25 &&
+                cv <= maxV + 35 &&
+                cu >= minU - 40 &&
+                cu <= maxU + 260) {
               for (final line in block.lines) {
                 if (line.cornerPoints.isNotEmpty) {
                   for (final p in line.cornerPoints) {
@@ -239,10 +310,14 @@ class KtpExtractor {
             final double cardULeft = minU - (cardWidth * 0.047);
             final double cardVTop = minV - (textHeight * 0.077);
 
-            // If signature/photo text on the right extends further, accommodate it
+            // If signature/photo text on the right extends further within front card, accommodate it
             if (maxU > cardULeft + (cardWidth * 0.94)) {
-              cardWidth = (maxU - cardULeft) / 0.95;
-              cardHeight = cardWidth / 1.5858;
+              final double extendedWidth = (maxU - cardULeft) / 0.95;
+              // Guard against abnormal ballooning
+              if (extendedWidth <= cardWidth * 1.25) {
+                cardWidth = extendedWidth;
+                cardHeight = cardWidth / 1.5858;
+              }
             }
 
             final double cardUCenter = cardULeft + (cardWidth / 2.0);
