@@ -58,16 +58,7 @@ extension SmartDocumentTypeX on SmartDocumentType {
   }
 
   /// Shutter action button label below the camera button.
-  String get shutterLabel {
-    switch (this) {
-      case SmartDocumentType.ktp:
-        return 'Ambil Foto e-KTP';
-      case SmartDocumentType.kartuKeluarga:
-        return 'Ambil Foto KK Asli';
-      case SmartDocumentType.suratSehat:
-        return 'Ambil Foto Surat Sehat Asli';
-    }
-  }
+  String get shutterLabel => 'Ambil Foto';
 
   /// Default title for the guidelines card.
   String get guidanceTitle {

@@ -133,9 +133,9 @@ Menyatakan keadaan SEHAT.
       expect(SmartDocumentType.kartuKeluarga.badgeLabel, 'Kartu Keluarga');
       expect(SmartDocumentType.suratSehat.badgeLabel, 'Surat Keterangan Sehat');
 
-      expect(SmartDocumentType.ktp.shutterLabel, 'Ambil Foto e-KTP');
-      expect(SmartDocumentType.kartuKeluarga.shutterLabel, 'Ambil Foto KK Asli');
-      expect(SmartDocumentType.suratSehat.shutterLabel, 'Ambil Foto Surat Sehat Asli');
+      expect(SmartDocumentType.ktp.shutterLabel, 'Ambil Foto');
+      expect(SmartDocumentType.kartuKeluarga.shutterLabel, 'Ambil Foto');
+      expect(SmartDocumentType.suratSehat.shutterLabel, 'Ambil Foto');
 
       expect(SmartDocumentType.ktp.submitButtonLabel, 'Kirim');
       expect(SmartDocumentType.suratSehat.submitButtonLabel, 'Kirim & Selesaikan Verifikasi');
