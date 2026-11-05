@@ -13,7 +13,7 @@ import '../utils/document_cropper.dart';
 import '../utils/kk_extractor_helper.dart';
 import '../utils/surat_sehat_extractor_helper.dart';
 
-/// Comprehensive multi-document camera verification screen matching the Figma designs.
+/// Comprehensive multi-document camera verification screen.
 ///
 /// Supports:
 /// - Any [SmartDocumentType]: [SmartDocumentType.ktp], [SmartDocumentType.kartuKeluarga], or [SmartDocumentType.suratSehat].
@@ -31,7 +31,7 @@ class SmartDocumentCameraScreen extends StatefulWidget {
   final String? headerTitle;
 
   /// Whether to show the top stepper progress header.
-  /// Defaults to true (matches Figma design).
+  /// Defaults to true.
   final bool showStepper;
 
   /// Current step number (1, 2, or 3). If omitted, inferred from [documentType].
@@ -786,7 +786,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                 ),
               ),
 
-              // Bottom Viewfinder Subtitle Banner (Matching Figma)
+              // Bottom Viewfinder Subtitle Banner
               Container(
                 width: cardWidth,
                 padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),

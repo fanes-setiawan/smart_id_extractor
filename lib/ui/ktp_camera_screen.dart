@@ -782,7 +782,7 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
                                       MainAxisAlignment.spaceBetween,
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    // Galeri Button (SVG dari Figma)
+                                    // Galeri Button
                                     _buildSvgActionButton(
                                       svgPath: 'assets/icons/ic_galeri.svg',
                                       label: 'Galeri',
@@ -843,7 +843,7 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
                                       ),
                                     ),
 
-                                    // Isi Manual Button (SVG dari Figma)
+                                    // Isi Manual Button
                                     _buildSvgActionButton(
                                       svgPath: 'assets/icons/ic_note.svg',
                                       label: 'Isi Manual',

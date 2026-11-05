@@ -502,7 +502,7 @@ class SmartDocumentWatermarkPainter extends CustomPainter {
       canvas.drawRRect(lineRect, linePaint);
     }
 
-    // 6. Bottom Stamp / Cap & Doctor Signature Placeholders (from Figma)
+    // 6. Bottom Stamp / Cap & Doctor Signature Placeholders
     final double badgeY = size.height * 0.72;
 
     // Cap / Stempel Badge on Left

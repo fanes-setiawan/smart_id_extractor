@@ -258,7 +258,7 @@ class _MainScreenState extends State<MainScreen>
                   ),
                   icon: const Icon(Icons.document_scanner_rounded),
                   label: const Text(
-                    'Smart Document Camera (Figma UI)',
+                    'Smart Document Camera',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   onPressed: () => _openSmartDocumentCamera(SmartDocumentType.ktp),
@@ -534,7 +534,7 @@ class _MainScreenState extends State<MainScreen>
                   ),
                   icon: const Icon(Icons.document_scanner_rounded),
                   label: const Text(
-                    'Buka Kamera KK (Sesuai Figma)',
+                    'Buka Kamera KK',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   onPressed: () => _openSmartDocumentCamera(SmartDocumentType.kartuKeluarga),
@@ -620,7 +620,7 @@ class _MainScreenState extends State<MainScreen>
                         color: Color(0xFFFD990F), size: 20),
                     SizedBox(width: 8),
                     Text(
-                      'Pindai Surat Keterangan Sehat (Figma UI)',
+                      'Pindai Surat Keterangan Sehat',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -642,7 +642,7 @@ class _MainScreenState extends State<MainScreen>
                   ),
                   icon: const Icon(Icons.document_scanner_rounded),
                   label: const Text(
-                    'Buka Kamera Surat Sehat (Sesuai Figma)',
+                    'Buka Kamera Surat Sehat',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   onPressed: () =>

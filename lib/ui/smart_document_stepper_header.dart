@@ -3,7 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../models/smart_document_type.dart';
 
-/// Top stepper progress bar header widget matching Figma design.
+/// Top stepper progress bar header widget.
 ///
 /// Features:
 /// - Label: "TAHAPAN BERKAS" (Amber / Orange `#FD990F`)
@@ -165,7 +165,7 @@ class SmartDocumentStepperHeader extends StatelessWidget {
   Widget _buildProgressBar({required bool isActiveOrDone, bool isCurrentOrange = false}) {
     Color barColor;
     if (isCurrentOrange && activeType == SmartDocumentType.suratSehat) {
-      barColor = const Color(0xFFFD990F); // Orange in Surat Sehat step Figma
+      barColor = const Color(0xFFFD990F); // Orange in Surat Sehat step
     } else if (isActiveOrDone) {
       barColor = const Color(0xFF0B3866); // Dark blue in completed/active
     } else {
