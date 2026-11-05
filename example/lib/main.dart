@@ -47,7 +47,7 @@ class DocumentExtractorApp extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        cardTheme: const CardThemeData(
+        cardTheme: const CardTheme(
           color: Colors.white,
           elevation: 0,
           margin: EdgeInsets.zero,
@@ -115,7 +115,7 @@ class _MainScreenState extends State<MainScreen>
           preferredSize: const Size.fromHeight(56),
           child: Container(
             color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: Container(
               height: 44,
               decoration: BoxDecoration(
@@ -124,6 +124,8 @@ class _MainScreenState extends State<MainScreen>
               ),
               child: TabBar(
                 controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
                 indicator: BoxDecoration(
@@ -132,7 +134,7 @@ class _MainScreenState extends State<MainScreen>
                 ),
                 labelColor: Colors.white,
                 unselectedLabelColor: const Color(0xFF64748B),
-                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 14),
                 labelStyle: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
@@ -145,7 +147,7 @@ class _MainScreenState extends State<MainScreen>
                   Tab(
                     iconMargin: EdgeInsets.zero,
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.badge_outlined, size: 17),
                         SizedBox(width: 6),
@@ -156,7 +158,7 @@ class _MainScreenState extends State<MainScreen>
                   Tab(
                     iconMargin: EdgeInsets.zero,
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.family_restroom_rounded, size: 17),
                         SizedBox(width: 6),
@@ -167,7 +169,7 @@ class _MainScreenState extends State<MainScreen>
                   Tab(
                     iconMargin: EdgeInsets.zero,
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.medical_services_outlined, size: 17),
                         SizedBox(width: 6),
@@ -178,7 +180,7 @@ class _MainScreenState extends State<MainScreen>
                   Tab(
                     iconMargin: EdgeInsets.zero,
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.flight_takeoff_rounded, size: 17),
                         SizedBox(width: 6),
@@ -924,7 +926,7 @@ class _MainScreenState extends State<MainScreen>
                           boxShadow: [
                             BoxShadow(
                               color: const Color(0xFF10B981)
-                                  .withValues(alpha: 0.12),
+                                  .withOpacity(0.12),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
@@ -949,7 +951,7 @@ class _MainScreenState extends State<MainScreen>
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF10B981)
-                                    .withValues(alpha: 0.12),
+                                    .withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: const Text(

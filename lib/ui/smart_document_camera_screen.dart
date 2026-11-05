@@ -489,54 +489,44 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
             fit: StackFit.expand,
             children: [
               SafeArea(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      physics: const ClampingScrollPhysics(),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                        child: IntrinsicHeight(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // 1. Top Header Bar: Back Chevron + Title
-                              _buildTopBar(),
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  padding: EdgeInsets.only(bottom: 16.h),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // 1. Top Header Bar: Back Chevron + Title
+                      _buildTopBar(),
 
-                              // 2. Stepper Header ("TAHAPAN BERKAS", 3 Bars, 3 Steps)
-                              if (widget.showStepper)
-                                SmartDocumentStepperHeader(
-                                  activeType: widget.documentType,
-                                  currentStep: widget.currentStep,
-                                  completedSteps: widget.completedSteps,
-                                ),
-
-                              SizedBox(height: 10.h),
-
-                              // 3. Viewfinder Container (Camera Preview + Watermark Overlay)
-                              _buildViewfinder(),
-
-                              SizedBox(height: 14.h),
-
-                              // 4. Panduan Pemindaian Card
-                              _buildGuidanceCard(),
-
-                              SizedBox(height: 16.h),
-
-                              // 5. Shutter Row & Gallery Button
-                              _buildShutterRow(),
-
-                              const Spacer(),
-
-                              // 6. Bottom Submit Button ("Kirim" / "Kirim & Selesaikan Verifikasi")
-                              if (widget.showSubmitButton) _buildSubmitButton(),
-
-                              SizedBox(height: 14.h),
-                            ],
-                          ),
+                      // 2. Stepper Header ("TAHAPAN BERKAS", 3 Bars, 3 Steps)
+                      if (widget.showStepper)
+                        SmartDocumentStepperHeader(
+                          activeType: widget.documentType,
+                          currentStep: widget.currentStep,
+                          completedSteps: widget.completedSteps,
                         ),
-                      ),
-                    );
-                  },
+
+                      SizedBox(height: 8.h),
+
+                      // 3. Viewfinder Container (Camera Preview + Watermark Overlay)
+                      _buildViewfinder(),
+
+                      SizedBox(height: 12.h),
+
+                      // 4. Panduan Pemindaian Card
+                      _buildGuidanceCard(),
+
+                      SizedBox(height: 14.h),
+
+                      // 5. Shutter Row & Gallery Button
+                      _buildShutterRow(),
+
+                      SizedBox(height: 14.h),
+
+                      // 6. Bottom Submit Button ("Kirim" / "Kirim & Selesaikan Verifikasi")
+                      if (widget.showSubmitButton) _buildSubmitButton(),
+                    ],
+                  ),
                 ),
               ),
 
@@ -894,110 +884,117 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   }
 
   Widget _buildShutterRow() {
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            // Shutter Button in Center
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24.w),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Gallery Button on the Left
+          if (widget.enableGallery)
             GestureDetector(
-              onTap: _captureFromCamera,
-              child: Container(
-                width: 78.r,
-                height: 78.r,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFFD990F).withOpacity(0.18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFD990F).withOpacity(0.24),
-                      blurRadius: 16.r,
-                      spreadRadius: 2.r,
-                      offset: Offset(0, 3.h),
+              onTap: _pickFromGallery,
+              child: SizedBox(
+                width: 60.w,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 46.r,
+                      height: 46.r,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF002245).withOpacity(0.06),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: SvgPicture.asset(
+                        'assets/icons/ic_galeri.svg',
+                        package: 'smart_id_extractor',
+                        width: 22.r,
+                        height: 22.r,
+                        colorFilter: const ColorFilter.mode(
+                          Color(0xFF002245),
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 5.h),
+                    Text(
+                      'Galeri',
+                      style: TextStyle(
+                        fontFamily: 'PlusJakartaSans',
+                        color: const Color(0xFF002245),
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
-                alignment: Alignment.center,
+              ),
+            )
+          else
+            SizedBox(width: 60.w),
+
+          // Center: Circular Orange Shutter Button & Label
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: _captureFromCamera,
                 child: Container(
-                  width: 62.r,
-                  height: 62.r,
-                  decoration: const BoxDecoration(
+                  width: 74.r,
+                  height: 74.r,
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0xFFFD990F),
+                    color: const Color(0xFFFD990F).withOpacity(0.18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFD990F).withOpacity(0.24),
+                        blurRadius: 16.r,
+                        spreadRadius: 2.r,
+                        offset: Offset(0, 3.h),
+                      ),
+                    ],
                   ),
                   alignment: Alignment.center,
-                  child: SvgPicture.asset(
-                    'assets/icons/ic_camera.svg',
-                    package: 'smart_id_extractor',
-                    width: 26.r,
-                    height: 26.r,
-                    colorFilter: const ColorFilter.mode(
-                      Colors.white,
-                      BlendMode.srcIn,
+                  child: Container(
+                    width: 58.r,
+                    height: 58.r,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFFD990F),
+                    ),
+                    alignment: Alignment.center,
+                    child: SvgPicture.asset(
+                      'assets/icons/ic_camera.svg',
+                      package: 'smart_id_extractor',
+                      width: 26.r,
+                      height: 26.r,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.white,
+                        BlendMode.srcIn,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-
-            // Gallery Button (left-aligned relative to row)
-            if (widget.enableGallery)
-              Positioned(
-                left: 36.w,
-                child: GestureDetector(
-                  onTap: _pickFromGallery,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 44.r,
-                        height: 44.r,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF002245).withOpacity(0.06),
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: SvgPicture.asset(
-                          'assets/icons/ic_galeri.svg',
-                          package: 'smart_id_extractor',
-                          width: 20.r,
-                          height: 20.r,
-                          colorFilter: const ColorFilter.mode(
-                            Color(0xFF002245),
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 4.h),
-                      Text(
-                        'Galeri',
-                        style: TextStyle(
-                          fontFamily: 'PlusJakartaSans',
-                          color: const Color(0xFF002245),
-                          fontSize: 10.5.sp,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+              SizedBox(height: 6.h),
+              Text(
+                widget.documentType.shutterLabel,
+                style: TextStyle(
+                  fontFamily: 'PlusJakartaSans',
+                  color: const Color(0xFF0B3866),
+                  fontSize: 12.5.sp,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-          ],
-        ),
-
-        SizedBox(height: 8.h),
-
-        // Shutter Label (e.g. "Ambil Foto KK Asli")
-        Text(
-          widget.documentType.shutterLabel,
-          style: TextStyle(
-            fontFamily: 'PlusJakartaSans',
-            color: const Color(0xFF002245),
-            fontSize: 13.5.sp,
-            fontWeight: FontWeight.w700,
+            ],
           ),
-        ),
-      ],
+
+          // Right Spacer to balance Gallery button width
+          SizedBox(width: 60.w),
+        ],
+      ),
     );
   }
 
