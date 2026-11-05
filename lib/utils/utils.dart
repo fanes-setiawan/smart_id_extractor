@@ -367,6 +367,8 @@ CardCorners? detectFlexibleKtpCorners(
   // 2. Locate NIK or primary identity anchor in display space to anchor single card detection
   double? nikV;
   double? nikU;
+  double nikHeight = 0.0;
+
   for (final block in recognized.blocks) {
     for (final line in block.lines) {
       final lineDigits = line.text.filterNumbersOnly();
@@ -376,11 +378,16 @@ CardCorners? detectFlexibleKtpCorners(
         final centerPt = transformOffset(Offset(r.left + r.width / 2, r.top + r.height / 2));
         nikU = centerPt.dx * cosT + centerPt.dy * sinT;
         nikV = -centerPt.dx * sinT + centerPt.dy * cosT;
+        nikHeight = max(r.height.toDouble(), 15.0);
         break;
       }
     }
     if (nikV != null) break;
   }
+
+  final double maxAboveNik = nikHeight > 0 ? nikHeight * 6.5 : 800.0;
+  final double maxBelowNik = nikHeight > 0 ? nikHeight * 14.0 : 1600.0;
+  final double maxHorizNik = nikHeight > 0 ? nikHeight * 22.0 : 2500.0;
 
   // 3. Project points into card coordinate space (u, v) in display space
   double minU = double.infinity;
@@ -405,10 +412,10 @@ CardCorners? detectFlexibleKtpCorners(
       final double cu = centerPt.dx * cosT + centerPt.dy * sinT;
       final double cv = -centerPt.dx * sinT + centerPt.dy * cosT;
       final double vDiff = cv - nikV;
-      if (vDiff < -220 || vDiff > 320) {
+      if (vDiff < -maxAboveNik || vDiff > maxBelowNik) {
         continue;
       }
-      if ((cu - nikU).abs() > 800) {
+      if ((cu - nikU).abs() > maxHorizNik) {
         continue;
       }
     }
@@ -464,6 +471,9 @@ CardCorners? detectFlexibleKtpCorners(
   }
 
   // Include nearby signature / photo text strictly within single card boundary
+  final double marginV = nikHeight > 0 ? nikHeight * 2.0 : 40.0;
+  final double marginURight = nikHeight > 0 ? nikHeight * 12.0 : 300.0;
+
   for (final block in recognized.blocks) {
     final blockText = block.text.toUpperCase();
     if (blockText.contains('KARTU TANDA PENDUDUK') && !blockText.contains('NIK')) {
@@ -475,10 +485,10 @@ CardCorners? detectFlexibleKtpCorners(
         transformOffset(Offset(r.left + r.width / 2, r.top + r.height / 2));
     final double cu = centerPt.dx * cosT + centerPt.dy * sinT;
     final double cv = -centerPt.dx * sinT + centerPt.dy * cosT;
-    if (cv >= minV - 25 &&
-        cv <= maxV + 35 &&
-        cu >= minU - 40 &&
-        cu <= maxU + 260) {
+    if (cv >= minV - marginV &&
+        cv <= maxV + marginV &&
+        cu >= minU - marginV &&
+        cu <= maxU + marginURight) {
       for (final line in block.lines) {
         for (final p in line.cornerPoints) {
           final pt = transformPoint(p);

@@ -164,6 +164,7 @@ class KtpExtractor {
         TextLine? nikLine;
         double? nikV;
         double? nikU;
+        double nikHeight = 0.0;
 
         for (final block in recognizedText.blocks) {
           for (final line in block.lines) {
@@ -174,11 +175,22 @@ class KtpExtractor {
               final r = line.boundingBox;
               nikU = (r.left + r.width / 2) * cosT + (r.top + r.height / 2) * sinT;
               nikV = -(r.left + r.width / 2) * sinT + (r.top + r.height / 2) * cosT;
+              nikHeight = max(r.height.toDouble(), 15.0);
               break;
             }
           }
           if (nikLine != null) break;
         }
+
+        // Dynamic scale factor derived from NIK line height:
+        // In standard KTP, NIK line height is ~5.5% - 7.5% of card height.
+        // Therefore, estimated card height ≈ nikHeight * 15.
+        // Header is at most ~5.5 * nikHeight above NIK.
+        // Footer is at most ~12.0 * nikHeight below NIK.
+        // Right margin is at most ~20.0 * nikHeight from NIK center.
+        final double maxAboveNik = nikHeight > 0 ? nikHeight * 6.5 : 800.0;
+        final double maxBelowNik = nikHeight > 0 ? nikHeight * 14.0 : 1600.0;
+        final double maxHorizNik = nikHeight > 0 ? nikHeight * 22.0 : 2500.0;
 
         // 3. Project relevant front-card text into the card's rotated frame (u, v)
         // u = along text line (width), v = perpendicular to text line (height)
@@ -226,18 +238,16 @@ class KtpExtractor {
             continue;
           }
 
-          // If NIK anchor was detected, enforce vertical proximity to the front card
+          // If NIK anchor was detected, enforce dynamic vertical and horizontal proximity
           if (nikV != null && nikU != null) {
             final r = block.boundingBox;
             final double cv = -(r.left + r.width / 2) * sinT + (r.top + r.height / 2) * cosT;
             final double cu = (r.left + r.width / 2) * cosT + (r.top + r.height / 2) * sinT;
-            // On a standard KTP, header is at most ~160px above NIK, footer is at most ~320px below NIK
-            // Anything significantly below NIK + 350 is part of another card/page (e.g. back card)
             final double vDiff = cv - nikV;
-            if (vDiff < -220 || vDiff > 320) {
+            if (vDiff < -maxAboveNik || vDiff > maxBelowNik) {
               continue;
             }
-            if ((cu - nikU).abs() > 800) {
+            if ((cu - nikU).abs() > maxHorizNik) {
               continue;
             }
           }
@@ -277,6 +287,9 @@ class KtpExtractor {
 
         if (minU < maxU && minV < maxV) {
           // Include nearby text (e.g. signature, date) strictly within the single front card area in (u, v) space
+          final double marginV = nikHeight > 0 ? nikHeight * 2.0 : 40.0;
+          final double marginURight = nikHeight > 0 ? nikHeight * 12.0 : 300.0;
+
           for (final block in recognizedText.blocks) {
             final blockText = block.text.toUpperCase();
             if (blockText.contains('KARTU TANDA PENDUDUK') && !blockText.contains('NIK')) {
@@ -288,10 +301,10 @@ class KtpExtractor {
                 (r.left + r.width / 2) * cosT + (r.top + r.height / 2) * sinT;
             final double cv =
                 -(r.left + r.width / 2) * sinT + (r.top + r.height / 2) * cosT;
-            if (cv >= minV - 25 &&
-                cv <= maxV + 35 &&
-                cu >= minU - 40 &&
-                cu <= maxU + 260) {
+            if (cv >= minV - marginV &&
+                cv <= maxV + marginV &&
+                cu >= minU - marginV &&
+                cu <= maxU + marginURight) {
               for (final line in block.lines) {
                 if (line.cornerPoints.isNotEmpty) {
                   for (final p in line.cornerPoints) {
