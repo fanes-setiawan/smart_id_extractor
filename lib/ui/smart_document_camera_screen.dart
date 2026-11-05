@@ -529,7 +529,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
 
                     // 5. Fixed Bottom Section: Shutter Row & Optional Submit Button
                     Container(
-                      padding: EdgeInsets.only(top: 8.h, bottom: 12.h),
+                      padding: EdgeInsets.only(top: 6.h, bottom: 10.h),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF9F9FF),
                         boxShadow: [
@@ -544,7 +544,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           _buildShutterRow(),
-                          if (widget.showSubmitButton) ...[
+                          // Tombol kirim hanya muncul jika dokumen sudah diambil/dipilih
+                          if (widget.showSubmitButton && _capturedImageFile != null) ...[
                             SizedBox(height: 10.h),
                             _buildSubmitButton(),
                           ],
@@ -631,9 +632,9 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
 
   Widget _buildViewfinder() {
     // Determine card dimensions based on document aspect ratio
-    final double cardWidth = 354.w;
+    final double cardWidth = 350.w;
     final double cardHeight = widget.documentType == SmartDocumentType.suratSehat
-        ? (cardWidth / 0.88).clamp(320.0, 360.0).h // Portrait A4 box styled comfortably
+        ? (cardWidth / 1.15).clamp(260.0, 300.0).h // Portrait A4 box dibuat proporsional agar seluruh halaman pas tanpa scroll
         : (cardWidth / widget.documentType.aspectRatio);
 
     final bool isCameraActive =
