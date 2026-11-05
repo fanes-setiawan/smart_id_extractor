@@ -192,3 +192,4 @@ class SmartDocumentResult extends Equatable {
         errorMessage,
       ];
 }
+

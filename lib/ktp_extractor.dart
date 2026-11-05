@@ -12,8 +12,10 @@ import 'models/kartu_keluarga_model.dart';
 import 'models/kartu_keluarga_validation.dart';
 import 'models/ktp_model.dart';
 import 'models/passport_model.dart';
+import 'models/smart_document_type.dart';
 import 'models/surat_sehat_model.dart';
 import 'models/surat_sehat_validation.dart';
+import 'utils/document_cropper.dart';
 import 'utils/kk_extractor_helper.dart';
 import 'utils/surat_sehat_extractor_helper.dart';
 
@@ -51,6 +53,18 @@ class KtpExtractor {
     _maritalKey: ['KAWIN', 'BELUM KAWIN'],
     _nationalityKey: ['WNI', 'WNA'],
   };
+
+  /// Crops any document (KTP, Kartu Keluarga, Surat Sehat) neatly around its borders.
+  static Future<File?> cropDocument(
+    File imageFile,
+    SmartDocumentType type,
+  ) async {
+    if (type == SmartDocumentType.ktp) {
+      final ktpCrop = await cropImageForKtp(imageFile);
+      if (ktpCrop != null) return ktpCrop;
+    }
+    return DocumentCropper.cropDocument(imageFile, type);
+  }
 
   /// Crops the KTP area from the provided image.
   ///

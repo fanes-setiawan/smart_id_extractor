@@ -133,3 +133,4 @@ class SuratSehatModel extends Equatable {
     return 'SuratSehatModel(nama: $nama, faskes: $namaFaskes, dokter: $namaDokter, tensi: $tekananDarah, kesimpulan: $kesimpulan)';
   }
 }
+

@@ -142,3 +142,4 @@ Menyatakan keadaan SEHAT.
     });
   });
 }
+

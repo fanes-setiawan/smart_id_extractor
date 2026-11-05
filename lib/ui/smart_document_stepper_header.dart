@@ -268,3 +268,4 @@ class SmartDocumentStepperHeader extends StatelessWidget {
     );
   }
 }
+

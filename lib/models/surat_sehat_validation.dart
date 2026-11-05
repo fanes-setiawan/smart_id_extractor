@@ -119,3 +119,4 @@ class SuratSehatValidationResult extends Equatable {
     return 'SuratSehatValidationResult(isValid: $isValid, confidence: ${(confidence * 100).toStringAsFixed(1)}%, keywords: $matchedKeywordCount)';
   }
 }
+

@@ -9,6 +9,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:image_picker/image_picker.dart';
 
 import '../ktp_extractor.dart';
+import '../utils/document_cropper.dart';
 import '../utils/kk_extractor_helper.dart';
 import '../utils/surat_sehat_extractor_helper.dart';
 
@@ -392,17 +393,38 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   }
 
   Future<SmartDocumentResult> _processKartuKeluarga(File imageFile) async {
+    // Crop & deskew Kartu Keluarga jika terdeteksi agar rapi dan teks terbaca jelas
+    final File? croppedFile = await DocumentCropper.cropDocument(
+      imageFile,
+      SmartDocumentType.kartuKeluarga,
+    );
+    final File finalImage = croppedFile ?? imageFile;
+
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
-      final inputImage = InputImage.fromFile(imageFile);
+      final inputImage = InputImage.fromFile(finalImage);
       final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
       final String rawText = recognizedText.text;
 
-      final validation = KkExtractorHelper.validateFromText(
+      var validation = KkExtractorHelper.validateFromText(
         rawText,
         options: widget.kkOptions,
         recognizedText: recognizedText,
       );
+
+      // Dual-pass fallback ke original jika crop terlalu ketat
+      if (!validation.isValid && croppedFile != null) {
+        final origInput = InputImage.fromFile(imageFile);
+        final origRecognized = await textRecognizer.processImage(origInput);
+        final origValidation = KkExtractorHelper.validateFromText(
+          origRecognized.text,
+          options: widget.kkOptions,
+          recognizedText: origRecognized,
+        );
+        if (origValidation.isValid) {
+          validation = origValidation;
+        }
+      }
 
       final String? errorMsg = validation.isValid
           ? null
@@ -412,7 +434,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
 
       return SmartDocumentResult(
         documentType: SmartDocumentType.kartuKeluarga,
-        imageFile: imageFile,
+        imageFile: finalImage,
         isValid: validation.isValid,
         rawText: rawText,
         kkModel: validation.data,
@@ -425,17 +447,38 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   }
 
   Future<SmartDocumentResult> _processSuratSehat(File imageFile) async {
+    // Crop & deskew Surat Sehat jika terdeteksi agar rapi dan teks terbaca jelas
+    final File? croppedFile = await DocumentCropper.cropDocument(
+      imageFile,
+      SmartDocumentType.suratSehat,
+    );
+    final File finalImage = croppedFile ?? imageFile;
+
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
-      final inputImage = InputImage.fromFile(imageFile);
+      final inputImage = InputImage.fromFile(finalImage);
       final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
       final String rawText = recognizedText.text;
 
-      final validation = SuratSehatExtractorHelper.validateFromText(
+      var validation = SuratSehatExtractorHelper.validateFromText(
         rawText,
         options: widget.suratSehatOptions,
         recognizedText: recognizedText,
       );
+
+      // Dual-pass fallback ke original jika crop terlalu ketat
+      if (!validation.isValid && croppedFile != null) {
+        final origInput = InputImage.fromFile(imageFile);
+        final origRecognized = await textRecognizer.processImage(origInput);
+        final origValidation = SuratSehatExtractorHelper.validateFromText(
+          origRecognized.text,
+          options: widget.suratSehatOptions,
+          recognizedText: origRecognized,
+        );
+        if (origValidation.isValid) {
+          validation = origValidation;
+        }
+      }
 
       final String? errorMsg = validation.isValid
           ? null
@@ -445,7 +488,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
 
       return SmartDocumentResult(
         documentType: SmartDocumentType.suratSehat,
-        imageFile: imageFile,
+        imageFile: finalImage,
         isValid: validation.isValid,
         rawText: rawText,
         suratSehatModel: validation.data,
