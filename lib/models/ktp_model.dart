@@ -18,6 +18,7 @@ class KtpModel extends Equatable {
   final String? occupation;
   final String? nationality;
   final String? validUntil;
+  final String? bloodType;
   final String? rawText;
 
   const KtpModel({
@@ -38,6 +39,7 @@ class KtpModel extends Equatable {
     this.occupation,
     this.nationality,
     this.validUntil,
+    this.bloodType,
     this.rawText,
   });
 
@@ -60,6 +62,7 @@ class KtpModel extends Equatable {
         occupation,
         nationality,
         validUntil,
+        bloodType,
         rawText,
       ];
 }

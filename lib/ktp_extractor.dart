@@ -442,6 +442,7 @@ class KtpExtractor {
     String? occupation;
     String? nationality;
     String? validUntil;
+    String? bloodType;
 
     if (kDebugMode) {
       print('Result text: ${recognizedText.text}');
@@ -549,23 +550,76 @@ class KtpExtractor {
           }
         }
 
-        // Extract Gender.
+        // Extract Gender & Golongan Darah.
         if (text.toLowerCase().contains('jenis kelamin') ||
             (text.toLowerCase().contains('jenis') &&
-                text.toLowerCase().contains('kelamin'))) {
-          String? lineText = recognizedText.findAndClean(line, 'jenis kelamin');
-          if (lineText != null) {
-            // Hilangkan "Gol. Darah" jika ikut tertangkap dalam satu baris
-            lineText = lineText
-                .split(RegExp(r'gol\.?\s*darah', caseSensitive: false))
-                .first
-                .trim();
-            lineText = lineText.filterNumberToAlphabet();
-            gender = lineText.correctWord(_expectedWords[_genderKey]!);
+                text.toLowerCase().contains('kelamin')) ||
+            text.toLowerCase().contains('gol. darah') ||
+            text.toLowerCase().contains('gol darah') ||
+            text.toLowerCase().contains('darah')) {
+          // 1. Ekstraksi Golongan Darah jika ada di baris ini
+          if (text.toLowerCase().contains('gol') ||
+              text.toLowerCase().contains('darah')) {
+            final bloodMatch = RegExp(
+              r'(?:gol\.?\s*darah|darah)\s*[:\s\-]*([a-zA-Z0-9\+\-]+)',
+              caseSensitive: false,
+            ).firstMatch(text);
+            if (bloodMatch != null) {
+              String rawBlood = bloodMatch.group(1)?.trim().toUpperCase() ?? '';
+              // Bersihkan jika tercampur kata lain
+              if (rawBlood.contains('AB')) {
+                bloodType = 'AB';
+              } else if (rawBlood.contains('A')) {
+                bloodType = 'A';
+              } else if (rawBlood.contains('B')) {
+                bloodType = 'B';
+              } else if (rawBlood.contains('O') || rawBlood.contains('0')) {
+                bloodType = 'O';
+              } else if (rawBlood == '-' || rawBlood.contains('TIDAK')) {
+                bloodType = 'N/A';
+              }
+            }
           }
-          if (kDebugMode) {
-            print('Text: $text');
-            print('Line Text: $lineText');
+
+          if (text.toLowerCase().contains('jenis kelamin') ||
+              (text.toLowerCase().contains('jenis') &&
+                  text.toLowerCase().contains('kelamin'))) {
+            String? lineText =
+                recognizedText.findAndClean(line, 'jenis kelamin');
+            if (lineText != null) {
+              // Cek juga golongan darah dari lineText sebelum di-split
+              if (bloodType == null &&
+                  lineText.toLowerCase().contains('darah')) {
+                final match = RegExp(
+                  r'(?:gol\.?\s*darah|darah)\s*[:\s\-]*([a-zA-Z0-9\+\-]+)',
+                  caseSensitive: false,
+                ).firstMatch(lineText);
+                if (match != null) {
+                  String b = match.group(1)?.trim().toUpperCase() ?? '';
+                  if (b.contains('AB')) {
+                    bloodType = 'AB';
+                  } else if (b.contains('A')) {
+                    bloodType = 'A';
+                  } else if (b.contains('B')) {
+                    bloodType = 'B';
+                  } else if (b.contains('O') || b.contains('0')) {
+                    bloodType = 'O';
+                  }
+                }
+              }
+
+              // Hilangkan "Gol. Darah" jika ikut tertangkap dalam satu baris
+              lineText = lineText
+                  .split(RegExp(r'gol\.?\s*darah', caseSensitive: false))
+                  .first
+                  .trim();
+              lineText = lineText.filterNumberToAlphabet();
+              gender = lineText.correctWord(_expectedWords[_genderKey]!);
+            }
+            if (kDebugMode) {
+              print('Text: $text');
+              print('Line Text: $lineText');
+            }
           }
         }
 
@@ -975,6 +1029,8 @@ class KtpExtractor {
       province: province,
       city: city,
       validUntil: validUntil,
+      bloodType: bloodType,
+      rawText: recognizedText.text,
     );
   }
 
