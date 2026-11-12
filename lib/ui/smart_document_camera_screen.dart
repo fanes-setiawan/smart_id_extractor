@@ -41,6 +41,9 @@ class SmartDocumentCameraScreen extends StatefulWidget {
   /// Set of completed steps for the stepper (e.g. `{1}` or `{1, 2}`).
   final Set<int> completedSteps;
 
+  /// Callback when user taps a specific step in the stepper header.
+  final ValueChanged<SmartDocumentType>? onStepTapped;
+
   /// Whether to show the gallery picker button. Defaults to true.
   final bool enableGallery;
 
@@ -82,6 +85,7 @@ class SmartDocumentCameraScreen extends StatefulWidget {
     this.showStepper = true,
     this.currentStep,
     this.completedSteps = const {},
+    this.onStepTapped,
     this.enableGallery = true,
     this.showSubmitButton = true,
     this.submitButtonLabel,
@@ -595,6 +599,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                         activeType: widget.documentType,
                         currentStep: widget.currentStep,
                         completedSteps: widget.completedSteps,
+                        onStepTapped: widget.onStepTapped,
                       ),
 
                     // Scrollable middle section: Viewfinder & Panduan
