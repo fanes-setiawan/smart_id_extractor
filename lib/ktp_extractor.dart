@@ -30,7 +30,6 @@ export 'models/sim_validation.dart';
 export 'models/smart_document_type.dart';
 export 'models/surat_sehat_model.dart';
 export 'models/surat_sehat_validation.dart';
-export 'ui/custom_snackbar.dart';
 export 'ui/ktp_camera_screen.dart';
 export 'ui/smart_document_camera_screen.dart';
 export 'ui/smart_document_stepper_header.dart';
