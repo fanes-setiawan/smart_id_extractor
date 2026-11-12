@@ -8,6 +8,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:smart_id_extractor/ktp_extractor.dart';
 import 'package:smart_id_extractor/utils/document_cropper.dart';
 import 'package:smart_id_extractor/utils/kk_extractor_helper.dart';
@@ -78,6 +79,18 @@ class SmartDocumentCameraScreen extends StatefulWidget {
   /// Custom icon or app logo to display inside the pill SnackBar.
   final Widget? snackBarIcon;
 
+  /// Whether to show a secondary skip button ("Lewati / Tidak Punya SIM").
+  final bool showSkipButton;
+
+  /// Label for the skip button. Defaults to 'Lewati / Tidak Punya Dokumen'.
+  final String? skipButtonLabel;
+
+  /// Callback when user taps the skip button.
+  final VoidCallback? onSkip;
+
+  /// Whether to show the back chevron button in the top bar. Defaults to true.
+  final bool showBackButton;
+
   const SmartDocumentCameraScreen({
     super.key,
     required this.documentType,
@@ -97,6 +110,10 @@ class SmartDocumentCameraScreen extends StatefulWidget {
     this.simOptions = const SimValidationOptions(),
     this.accentColor = const Color(0xFFFD990F),
     this.snackBarIcon,
+    this.showSkipButton = false,
+    this.skipButtonLabel,
+    this.onSkip,
+    this.showBackButton = true,
   });
 
   @override
@@ -114,6 +131,10 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   bool _isInitializingCamera = false;
   bool _isProcessing = false;
   bool _isDisposed = false;
+  bool _cameraPermissionDenied = false;
+  bool _cameraPermissionPermanentlyDenied = false;
+  bool _cameraInitFailed = false;
+  int _cameraInitRetryCount = 0;
 
   File? _capturedImageFile;
   SmartDocumentResult? _latestResult;
@@ -142,13 +163,52 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
     _initCamera();
   }
 
-  Future<void> _initCamera() async {
+  Future<void> _initCamera({bool manualRetry = false}) async {
     if (_isInitializingCamera) return;
     _isInitializingCamera = true;
 
+    if (manualRetry) {
+      _cameraInitRetryCount = 0;
+      if (mounted) {
+        setState(() {
+          _cameraInitFailed = false;
+        });
+      }
+    }
+
     try {
+      final status = await Permission.camera.request();
+      if (status.isPermanentlyDenied) {
+        if (mounted) {
+          setState(() {
+            _cameraPermissionDenied = true;
+            _cameraPermissionPermanentlyDenied = true;
+            _cameraInitFailed = false;
+          });
+        }
+        return;
+      } else if (!status.isGranted) {
+        if (mounted) {
+          setState(() {
+            _cameraPermissionDenied = true;
+            _cameraPermissionPermanentlyDenied = false;
+            _cameraInitFailed = false;
+          });
+        }
+        return;
+      }
+
+      if (mounted && (_cameraPermissionDenied || _cameraInitFailed)) {
+        setState(() {
+          _cameraPermissionDenied = false;
+          _cameraPermissionPermanentlyDenied = false;
+          _cameraInitFailed = false;
+        });
+      }
+
       _cameras = await availableCameras();
       if (_cameras.isEmpty) {
+        _handleCameraInitFailure();
         return;
       }
 
@@ -158,9 +218,28 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       if (selectedIdx == -1) selectedIdx = 0;
       await _startCameraController(selectedIdx);
     } catch (e) {
-      // Ignored
+      _handleCameraInitFailure();
     } finally {
       _isInitializingCamera = false;
+    }
+  }
+
+  void _handleCameraInitFailure() {
+    _cameraInitRetryCount++;
+    if (_cameraInitRetryCount < 3) {
+      // Otomatis coba lagi dengan jeda 500ms hingga maksimal 3 kali percobaan
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && !_isDisposed && _controller == null) {
+          _initCamera();
+        }
+      });
+    } else {
+      // Setelah 3 kali gagal berturut-turut, baru tampilkan tombol "Coba Lagi"
+      if (mounted) {
+        setState(() {
+          _cameraInitFailed = true;
+        });
+      }
     }
   }
 
@@ -176,7 +255,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
 
     final controller = CameraController(
       description,
-      ResolutionPreset.veryHigh,
+      ResolutionPreset.high,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.jpeg,
     );
@@ -194,10 +273,12 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       if (mounted) {
         setState(() {
           _controller = controller;
+          _cameraInitFailed = false;
+          _cameraInitRetryCount = 0;
         });
       }
     } catch (e) {
-      // Ignored
+      _handleCameraInitFailure();
     }
   }
 
@@ -253,7 +334,9 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   Future<void> _captureFromCamera() async {
     if (_controller == null ||
         !_controller!.value.isInitialized ||
-        _isProcessing) return;
+        _isProcessing) {
+      return;
+    }
 
     try {
       setState(() {
@@ -648,6 +731,11 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                             SizedBox(height: 10.h),
                             _buildSubmitButton(),
                           ],
+                          // Tombol Lewati (opsional, misal untuk SIM jika user tidak memiliki SIM)
+                          if (widget.showSkipButton) ...[
+                            SizedBox(height: 8.h),
+                            _buildSkipButton(),
+                          ],
                         ],
                       ),
                     ),
@@ -700,17 +788,19 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       child: Row(
         children: [
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: const Color(0xFF111C2D),
-              size: 20.sp,
+          if (widget.showBackButton) ...[
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: const Color(0xFF111C2D),
+                size: 20.sp,
+              ),
+              onPressed: () => Navigator.of(context).pop(),
             ),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          SizedBox(width: 14.w),
+            SizedBox(width: 14.w),
+          ],
           Expanded(
             child: Text(
               widget.headerTitle ?? widget.documentType.defaultTitle,
@@ -778,7 +868,9 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                         onTapDown: (TapDownDetails details) async {
                           final controller = _controller;
                           if (controller == null ||
-                              !controller.value.isInitialized) return;
+                              !controller.value.isInitialized) {
+                            return;
+                          }
                           try {
                             final offset = Offset(
                               (details.localPosition.dx / cardWidth)
@@ -798,6 +890,136 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                             height: _controller!.value.previewSize?.width ??
                                 cardHeight,
                             child: CameraPreview(_controller!),
+                          ),
+                        ),
+                      )
+                    else if (_cameraPermissionDenied)
+                      Container(
+                        color: const Color(0xFF111C2D),
+                        padding: EdgeInsets.symmetric(horizontal: 20.w),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.no_photography_outlined,
+                                color: const Color(0xFFFD990F),
+                                size: 38.r,
+                              ),
+                              SizedBox(height: 10.h),
+                              Text(
+                                'Izin Kamera Belum Diberikan',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'PlusJakartaSans',
+                                  color: Colors.white,
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(height: 6.h),
+                              Text(
+                                'Aplikasi memerlukan izin akses kamera untuk memindai dokumen fisik.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'PlusJakartaSans',
+                                  color: Colors.white.withOpacity(0.75),
+                                  fontSize: 11.sp,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: 12.h),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  if (_cameraPermissionPermanentlyDenied) {
+                                    await openAppSettings();
+                                  } else {
+                                    _initCamera();
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFD990F),
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 14.w, vertical: 8.h),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10.r),
+                                  ),
+                                ),
+                                child: Text(
+                                  _cameraPermissionPermanentlyDenied
+                                      ? 'Buka Pengaturan'
+                                      : 'Izinkan Kamera',
+                                  style: TextStyle(
+                                    fontFamily: 'PlusJakartaSans',
+                                    fontSize: 11.5.sp,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (_cameraInitFailed)
+                      Container(
+                        color: const Color(0xFF111C2D),
+                        padding: EdgeInsets.symmetric(horizontal: 20.w),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.videocam_off_outlined,
+                                color: const Color(0xFFFD990F),
+                                size: 38.r,
+                              ),
+                              SizedBox(height: 10.h),
+                              Text(
+                                'Kamera Gagal Dimuat',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'PlusJakartaSans',
+                                  color: Colors.white,
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(height: 6.h),
+                              Text(
+                                'Sensor kamera sedang sibuk atau tidak merespons.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'PlusJakartaSans',
+                                  color: Colors.white.withOpacity(0.75),
+                                  fontSize: 11.sp,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: 12.h),
+                              ElevatedButton(
+                                onPressed: () {
+                                  _initCamera(manualRetry: true);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFD990F),
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 14.w, vertical: 8.h),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10.r),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Coba Lagi',
+                                  style: TextStyle(
+                                    fontFamily: 'PlusJakartaSans',
+                                    fontSize: 11.5.sp,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       )
@@ -1216,6 +1438,48 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w700,
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkipButton() {
+    final String label =
+        widget.skipButtonLabel ?? 'Lewati / Tidak Punya Dokumen';
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.w),
+      child: SizedBox(
+        height: 44.h,
+        child: TextButton(
+          onPressed: widget.onSkip,
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFF64748B),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.r),
+              side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.0),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'PlusJakartaSans',
+                  color: const Color(0xFF64748B),
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(width: 6.w),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 13.sp,
+                color: const Color(0xFF64748B),
               ),
             ],
           ),

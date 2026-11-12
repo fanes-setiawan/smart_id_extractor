@@ -15,12 +15,17 @@ class SimExtractorHelper {
     'KEPOLISIAN DAERAH',
     'KORLANTAS',
     'POLRI',
+    'INDONESIA',
+    'MENGEMUDI',
+    'LICENSE',
   ];
 
   /// Core keywords commonly present in Indonesian SIM cards
   static const List<String> simKeywords = [
     'SURAT IZIN MENGEMUDI',
+    'SURAT IJIN MENGEMUDI',
     'DRIVING LICENSE',
+    'INDONESIA',
     'POLRI',
     'KORLANTAS',
     'KEPOLISIAN',
@@ -35,6 +40,14 @@ class SimExtractorHelper {
     'TEMPAT',
     'TGL. LAHIR',
     'TGL LAHIR',
+    'PELAJAR',
+    'MAHASISWA',
+    'KARYAWAN',
+    'SWASTA',
+    'JABAR',
+    'JATENG',
+    'JATIM',
+    'JAKARTA',
     'SIM',
     'POLDA',
     'KAPOLDA',
@@ -63,6 +76,13 @@ class SimExtractorHelper {
         hasHeader = true;
         break;
       }
+    }
+    // Fuzzy fallback jika tulisan merah SURAT IZIN MENGEMUDI agak pudar
+    if (!hasHeader) {
+      hasHeader = cleanText.contains('MENGEMUDI') ||
+          cleanText.contains('DRIVING') ||
+          cleanText.contains('LICENSE') ||
+          (cleanText.contains('INDONESIA') && !cleanText.contains('REPUBLIK INDONESIA'));
     }
 
     // 2. Keyword matching
@@ -155,6 +175,11 @@ class SimExtractorHelper {
     if (isLikelyKk) {
       missingRequirements
           .add('Dokumen terdeteksi sebagai Kartu Keluarga (KK), bukan SIM.');
+    }
+
+    // Fallback: Jika memiliki Nomor SIM berformat resmi (xxxx-xxxx-xxxxxx) atau ada kata kunci khas SIM dan bukan KTP/KK
+    if (!hasHeader && hasNomorSim && !isLikelyKtp && !isLikelyKk) {
+      hasHeader = true;
     }
 
     if (options.requireHeader && !hasHeader) {

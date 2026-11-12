@@ -132,5 +132,29 @@ BERLAKU S/D 2028
       expect(result.isValid, isFalse);
       expect(result.missingRequirements.any((r) => r.contains('Golongan SIM')), isTrue);
     });
+
+    test('Validates real photo sample with low-contrast header (Veri Vardia)', () {
+      const realSampleOcr = '''
+INDONESIA
+1005-0304-000388
+C
+1. VERI VARDIA
+2. BANDUNG, 16-04-2003
+3. O - PRIA
+4. JL. MENTOP NO.39
+RT 08/07 CICENDO
+KOTA BANDUNG
+5. PELAJAR/MHS
+6. JABAR
+24-09-2025
+''';
+      final result = SmartIdExtractor.validateSimFromText(realSampleOcr);
+
+      expect(result.isValid, isTrue);
+      expect(result.hasHeader, isTrue);
+      expect(result.hasNomorSim, isTrue);
+      expect(result.nomorSim, '10050304000388');
+      expect(result.missingRequirements, isEmpty);
+    });
   });
 }
