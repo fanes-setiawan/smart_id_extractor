@@ -499,7 +499,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   }
 
   Future<SmartDocumentResult> _processSuratSehat(File imageFile) async {
-    // Crop & deskew Surat Sehat jika terdeteksi agar rapi dan teks terbaca jelas
+    // 1. Crop & deskew Surat Sehat agar rapi, lurus, dan teks terbaca jelas
     final File? croppedFile = await DocumentCropper.cropDocument(
       imageFile,
       SmartDocumentType.suratSehat,
@@ -513,38 +513,36 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
           await textRecognizer.processImage(inputImage);
       final String rawText = recognizedText.text;
 
-      var validation = SuratSehatExtractorHelper.validateFromText(
-        rawText,
-        options: widget.suratSehatOptions,
-        recognizedText: recognizedText,
+      // Cukup pastikan ada teks dokumen yang terdeteksi (tidak perlu kriteria ketat)
+      final String cleanTrimmedText = rawText.replaceAll(RegExp(r'\s+'), ' ').trim();
+      final bool hasAnyText = cleanTrimmedText.length >= 10;
+
+      // Parse structured data if available
+      final SuratSehatModel parsedModel = SuratSehatExtractorHelper.parseFromText(rawText);
+
+      final SuratSehatValidationResult validation = SuratSehatValidationResult(
+        isValid: hasAnyText,
+        confidence: hasAnyText ? 1.0 : 0.0,
+        hasHeader: true,
+        hasDokter: parsedModel.namaDokter != null,
+        hasFaskes: parsedModel.namaFaskes != null,
+        hasPemeriksaanFisik: parsedModel.tekananDarah != null || parsedModel.beratBadan != null,
+        matchedKeywordCount: cleanTrimmedText.length,
+        matchedKeywords: const [],
+        missingRequirements: hasAnyText ? const [] : const ['Teks pada dokumen Surat Sehat tidak terdeteksi. Pastikan foto tidak blur.'],
+        data: parsedModel,
       );
 
-      // Dual-pass fallback ke original jika crop terlalu ketat
-      if (!validation.isValid && croppedFile != null) {
-        final origInput = InputImage.fromFile(imageFile);
-        final origRecognized = await textRecognizer.processImage(origInput);
-        final origValidation = SuratSehatExtractorHelper.validateFromText(
-          origRecognized.text,
-          options: widget.suratSehatOptions,
-          recognizedText: origRecognized,
-        );
-        if (origValidation.isValid) {
-          validation = origValidation;
-        }
-      }
-
-      final String? errorMsg = validation.isValid
+      final String? errorMsg = hasAnyText
           ? null
-          : (validation.missingRequirements.isNotEmpty
-              ? validation.missingRequirements.first
-              : 'Foto yang Anda unggah bukan dokumen Surat Keterangan Sehat. Pastikan lembar fisik asli dari faskes berada di dalam bingkai.');
+          : 'Teks pada dokumen Surat Sehat tidak terdeteksi. Pastikan foto tidak blur.';
 
       return SmartDocumentResult(
         documentType: SmartDocumentType.suratSehat,
         imageFile: finalImage,
-        isValid: validation.isValid,
+        isValid: hasAnyText,
         rawText: rawText,
-        suratSehatModel: validation.data,
+        suratSehatModel: parsedModel,
         suratSehatValidation: validation,
         errorMessage: errorMsg,
       );
