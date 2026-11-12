@@ -143,26 +143,32 @@ class SimExtractorHelper {
 
     // Negative indicators checked first so failureReason accurately reports wrong document types
     final bool isLikelyKtp = cleanText.contains('KARTU TANDA PENDUDUK') ||
-        (cleanText.contains('NIK') && cleanText.contains('PROVINSI') && !cleanText.contains('MENGEMUDI'));
+        (cleanText.contains('NIK') &&
+            cleanText.contains('PROVINSI') &&
+            !cleanText.contains('MENGEMUDI'));
     final bool isLikelyKk = cleanText.contains('KARTU KELUARGA');
 
     if (isLikelyKtp) {
-      missingRequirements.add('Dokumen terdeteksi sebagai Kartu Tanda Penduduk (e-KTP), bukan SIM.');
+      missingRequirements.add(
+          'Dokumen terdeteksi sebagai Kartu Tanda Penduduk (e-KTP), bukan SIM.');
     }
     if (isLikelyKk) {
-      missingRequirements.add('Dokumen terdeteksi sebagai Kartu Keluarga (KK), bukan SIM.');
+      missingRequirements
+          .add('Dokumen terdeteksi sebagai Kartu Keluarga (KK), bukan SIM.');
     }
 
     if (options.requireHeader && !hasHeader) {
-      missingRequirements.add('Foto yang Anda unggah bukan dokumen SIM. Pastikan judul "SURAT IZIN MENGEMUDI" terbaca jelas di dalam bingkai.');
+      missingRequirements.add('Foto yang Anda unggah bukan dokumen SIM');
     }
 
     if (options.requireGolongan && !hasGolongan) {
-      missingRequirements.add('Golongan SIM (A/B/C/D) tidak terdeteksi jelas pada kartu SIM.');
+      missingRequirements
+          .add('Golongan SIM (A/B/C/D) tidak terdeteksi jelas pada kartu SIM.');
     }
 
     if (options.requireNomorSim && !hasNomorSim) {
-      missingRequirements.add('Nomor SIM tidak terdeteksi. Pastikan fisik kartu SIM terbaca tajam tanpa blur.');
+      missingRequirements.add(
+          'Nomor SIM tidak terdeteksi. Pastikan fisik kartu SIM terbaca tajam tanpa blur.');
     }
 
     if (matchedKeywords.length < options.minKeywordMatches) {

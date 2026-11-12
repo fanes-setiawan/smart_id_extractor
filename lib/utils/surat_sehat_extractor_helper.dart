@@ -66,7 +66,8 @@ class SuratSehatExtractorHelper {
         (upper.contains('SURAT') && upper.contains('SEHAT'));
 
     if (options.requireHeader && !hasHeader) {
-      missingRequirements.add("Foto yang Anda unggah bukan dokumen Surat Keterangan Sehat. Pastikan judul surat dan instansi kesehatan terbaca jelas.");
+      missingRequirements.add(
+          "Foto yang Anda unggah bukan dokumen Surat Keterangan Sehat. Pastikan  surat dan instansi kesehatan terbaca jelas.");
     }
 
     // 2. Doctor / Examiner Detection
@@ -77,7 +78,8 @@ class SuratSehatExtractorHelper {
         upper.contains('NIP');
 
     if (options.requireDokter && !hasDokter) {
-      missingRequirements.add("Tanda tangan dokter pemeriksa / SIP tidak terdeteksi pada Surat Sehat.");
+      missingRequirements.add(
+          "Tanda tangan dokter pemeriksa / SIP tidak terdeteksi pada Surat Sehat.");
     }
 
     // 3. Health Facility Detection
@@ -90,7 +92,8 @@ class SuratSehatExtractorHelper {
         upper.contains('LABORATORIUM');
 
     if (options.requireFaskes && !hasFaskes) {
-      missingRequirements.add("Identitas fasilitas kesehatan (RS / Puskesmas / Klinik) tidak terdeteksi jelas.");
+      missingRequirements.add(
+          "Identitas fasilitas kesehatan (RS / Puskesmas / Klinik) tidak terdeteksi jelas.");
     }
 
     // 4. Physical Examination Metrics Detection
@@ -104,7 +107,8 @@ class SuratSehatExtractorHelper {
         upper.contains('PEMERIKSAAN FISIK');
 
     if (options.requirePemeriksaanFisik && !hasPemeriksaanFisik) {
-      missingRequirements.add("Rincian hasil pemeriksaan fisik tidak terdeteksi pada dokumen.");
+      missingRequirements.add(
+          "Rincian hasil pemeriksaan fisik tidak terdeteksi pada dokumen.");
     }
 
     // 5. Keyword Matching
@@ -158,7 +162,11 @@ class SuratSehatExtractorHelper {
 
   /// Parses fields from the raw OCR text into a structured [SuratSehatModel].
   static SuratSehatModel parseFromText(String rawText) {
-    final lines = rawText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    final lines = rawText
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
 
     String? nama;
     String? nik;
@@ -180,9 +188,14 @@ class SuratSehatExtractorHelper {
     String? tanggalSurat;
 
     final nikRegex = RegExp(r'\b[1-9]\d{15}\b');
-    final bpRegex = RegExp(r'(\d{2,3}\s*\/\s*\d{2,3})\s*(mm\s*hg)?', caseSensitive: false);
-    final tbRegex = RegExp(r'(?:tb|tinggi\s*badan)?\s*[:=]?\s*(\d{2,3})\s*(?:cm)?\b', caseSensitive: false);
-    final bbRegex = RegExp(r'(?:bb|berat\s*badan)?\s*[:=]?\s*(\d{2,3}(?:[.,]\d)?)\s*(?:kg)?\b', caseSensitive: false);
+    final bpRegex =
+        RegExp(r'(\d{2,3}\s*\/\s*\d{2,3})\s*(mm\s*hg)?', caseSensitive: false);
+    final tbRegex = RegExp(
+        r'(?:tb|tinggi\s*badan)?\s*[:=]?\s*(\d{2,3})\s*(?:cm)?\b',
+        caseSensitive: false);
+    final bbRegex = RegExp(
+        r'(?:bb|berat\s*badan)?\s*[:=]?\s*(\d{2,3}(?:[.,]\d)?)\s*(?:kg)?\b',
+        caseSensitive: false);
 
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i];
@@ -208,7 +221,10 @@ class SuratSehatExtractorHelper {
       }
 
       // Nama Pasien
-      if (nama == null && (upper.startsWith('NAMA') || upper.contains('NAMA :') || upper.contains('NAMA:'))) {
+      if (nama == null &&
+          (upper.startsWith('NAMA') ||
+              upper.contains('NAMA :') ||
+              upper.contains('NAMA:'))) {
         final val = _extractValueAfterColon(line);
         if (val != null && !val.toUpperCase().contains('DOKTER')) {
           nama = val;
@@ -223,10 +239,17 @@ class SuratSehatExtractorHelper {
       }
 
       // Jenis Kelamin
-      if (jenisKelamin == null && (upper.contains('JENIS KELAMIN') || upper.contains('KELAMIN') || upper.contains('SEX'))) {
-        if (upper.contains('LAKI') || upper.contains('PRIA') || upper.contains('(L)')) {
+      if (jenisKelamin == null &&
+          (upper.contains('JENIS KELAMIN') ||
+              upper.contains('KELAMIN') ||
+              upper.contains('SEX'))) {
+        if (upper.contains('LAKI') ||
+            upper.contains('PRIA') ||
+            upper.contains('(L)')) {
           jenisKelamin = 'Laki-laki';
-        } else if (upper.contains('PEREMPUAN') || upper.contains('WANITA') || upper.contains('(P)')) {
+        } else if (upper.contains('PEREMPUAN') ||
+            upper.contains('WANITA') ||
+            upper.contains('(P)')) {
           jenisKelamin = 'Perempuan';
         } else {
           jenisKelamin = _extractValueAfterColon(line);
@@ -239,12 +262,16 @@ class SuratSehatExtractorHelper {
       }
 
       // Alamat
-      if (alamat == null && (upper.startsWith('ALAMAT') || upper.contains('ALAMAT :'))) {
+      if (alamat == null &&
+          (upper.startsWith('ALAMAT') || upper.contains('ALAMAT :'))) {
         alamat = _extractValueAfterColon(line);
       }
 
       // Tekanan Darah / Tensi
-      if (tekananDarah == null && (upper.contains('TENSI') || upper.contains('TEKANAN DARAH') || upper.contains('TD'))) {
+      if (tekananDarah == null &&
+          (upper.contains('TENSI') ||
+              upper.contains('TEKANAN DARAH') ||
+              upper.contains('TD'))) {
         final match = bpRegex.firstMatch(line);
         if (match != null) {
           tekananDarah = '${match.group(1)} mmHg';
@@ -254,7 +281,8 @@ class SuratSehatExtractorHelper {
       }
 
       // Tinggi Badan
-      if (tinggiBadan == null && (upper.contains('TINGGI BADAN') || upper.startsWith('TB'))) {
+      if (tinggiBadan == null &&
+          (upper.contains('TINGGI BADAN') || upper.startsWith('TB'))) {
         final match = tbRegex.firstMatch(line);
         if (match != null && match.group(1) != null) {
           tinggiBadan = '${match.group(1)} cm';
@@ -264,7 +292,8 @@ class SuratSehatExtractorHelper {
       }
 
       // Berat Badan
-      if (beratBadan == null && (upper.contains('BERAT BADAN') || upper.startsWith('BB'))) {
+      if (beratBadan == null &&
+          (upper.contains('BERAT BADAN') || upper.startsWith('BB'))) {
         final match = bbRegex.firstMatch(line);
         if (match != null && match.group(1) != null) {
           beratBadan = '${match.group(1)} kg';
@@ -274,9 +303,13 @@ class SuratSehatExtractorHelper {
       }
 
       // Golongan Darah
-      if (golonganDarah == null && (upper.contains('GOLONGAN DARAH') || upper.contains('GOL. DARAH') || upper.contains('GOL DARAH'))) {
+      if (golonganDarah == null &&
+          (upper.contains('GOLONGAN DARAH') ||
+              upper.contains('GOL. DARAH') ||
+              upper.contains('GOL DARAH'))) {
         final val = _extractValueAfterColon(line) ?? line;
-        final golMatch = RegExp(r'\b(A|B|AB|O)\b', caseSensitive: false).firstMatch(val);
+        final golMatch =
+            RegExp(r'\b(A|B|AB|O)\b', caseSensitive: false).firstMatch(val);
         if (golMatch != null) {
           golonganDarah = golMatch.group(1)?.toUpperCase();
         }
@@ -284,7 +317,9 @@ class SuratSehatExtractorHelper {
 
       // Buta Warna
       if (butaWarna == null && upper.contains('BUTA WARNA')) {
-        if (upper.contains('TIDAK') || upper.contains('NORMAL') || upper.contains('NEGATIF')) {
+        if (upper.contains('TIDAK') ||
+            upper.contains('NORMAL') ||
+            upper.contains('NEGATIF')) {
           butaWarna = 'Tidak Buta Warna (Normal)';
         } else if (upper.contains('PARSIAL') || upper.contains('TOTAL')) {
           butaWarna = 'Buta Warna';
@@ -305,7 +340,8 @@ class SuratSehatExtractorHelper {
       }
 
       // Dokter
-      if (namaDokter == null && (upper.contains('DOKTER PEMERIKSA') || upper.contains('DR. '))) {
+      if (namaDokter == null &&
+          (upper.contains('DOKTER PEMERIKSA') || upper.contains('DR. '))) {
         if (upper.contains('DR. ')) {
           namaDokter = line;
         } else if (i + 1 < lines.length) {
@@ -314,7 +350,8 @@ class SuratSehatExtractorHelper {
       }
 
       // SIP / NIP
-      if (nomorSip == null && (upper.contains('SIP') || upper.contains('NIP'))) {
+      if (nomorSip == null &&
+          (upper.contains('SIP') || upper.contains('NIP'))) {
         nomorSip = _extractValueAfterColon(line) ?? line;
       }
     }
@@ -353,4 +390,3 @@ class SuratSehatExtractorHelper {
     return null;
   }
 }
-
