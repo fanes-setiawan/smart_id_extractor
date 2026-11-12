@@ -62,7 +62,8 @@ class KkExtractorHelper {
         (upper.contains('KELUARGA') && upper.contains('REPUBLIK INDONESIA'));
 
     if (options.requireHeader && !hasHeader) {
-      missingRequirements.add("Header 'KARTU KELUARGA' tidak ditemukan.");
+      missingRequirements
+          .add("Judul 'KARTU KELUARGA' tidak ditemukan pada dokumen.");
     }
 
     // 2. Nomor KK Detection
@@ -71,7 +72,7 @@ class KkExtractorHelper {
 
     if (options.requireNomorKk && !hasNomorKk) {
       missingRequirements.add(
-          "Nomor Kartu Keluarga (16 digit) wajib ada tetapi tidak ditemukan.");
+          "Nomor Kartu Keluarga (16 digit) tidak terdeteksi. Pastikan fisik KK asli dan tidak blur.");
     }
 
     // 3. Kepala Keluarga Detection
@@ -81,7 +82,7 @@ class KkExtractorHelper {
 
     if (options.requireKepalaKeluarga && !hasKepalaKeluarga) {
       missingRequirements
-          .add("Bagian 'Nama Kepala Keluarga' tidak ditemukan.");
+          .add("Bagian Nama Kepala Keluarga tidak terdeteksi pada dokumen KK.");
     }
 
     // 4. Address Section Detection
@@ -103,8 +104,8 @@ class KkExtractorHelper {
     final bool hasAddress = addressKeywordMatches >= 2;
 
     if (options.requireAddress && !hasAddress) {
-      missingRequirements
-          .add("Informasi Alamat / Wilayah Kartu Keluarga tidak lengkap.");
+      missingRequirements.add(
+          "Informasi alamat pada Kartu Keluarga tidak terdeteksi dengan jelas.");
     }
 
     // 5. Keyword Matches
@@ -126,7 +127,7 @@ class KkExtractorHelper {
 
     if (matchedKeywords.length < options.minKeywordMatches) {
       missingRequirements.add(
-        'Kata kunci Kartu Keluarga tidak mencukupi (ditemukan ${matchedKeywords.length}, minimal ${options.minKeywordMatches}).',
+        'Foto yang Anda unggah bukan dokumen Kartu Keluarga (KK) yang valid. Silakan gunakan dokumen fisik asli.',
       );
     }
 
@@ -134,7 +135,8 @@ class KkExtractorHelper {
     for (final customKw in options.customKeywords) {
       final customUpper = customKw.toUpperCase().trim();
       if (customUpper.isNotEmpty && !upper.contains(customUpper)) {
-        missingRequirements.add("Kata kunci wajib '$customKw' tidak ditemukan.");
+        missingRequirements
+            .add("Kata kunci wajib '$customKw' tidak ditemukan.");
       }
     }
 
@@ -152,7 +154,8 @@ class KkExtractorHelper {
     final bool isValid = missingRequirements.isEmpty;
 
     // 8. Extract Model Data
-    final KartuKeluargaModel data = _extractModel(rawText, recognizedText, nomorKk);
+    final KartuKeluargaModel data =
+        _extractModel(rawText, recognizedText, nomorKk);
 
     return KartuKeluargaValidationResult(
       isValid: isValid,
@@ -283,9 +286,12 @@ class KkExtractorHelper {
 
       // Nama Kepala Keluarga
       if (namaKepalaKeluarga == null &&
-          (upper.contains('KEPALA KELUARGA') || upper.contains('NAMA KEPALA'))) {
-        namaKepalaKeluarga = _cleanValue(line, ['NAMA KEPALA KELUARGA', 'KEPALA KELUARGA', 'NAMA KEPALA']);
-        if ((namaKepalaKeluarga == null || namaKepalaKeluarga.isEmpty) && i + 1 < lines.length) {
+          (upper.contains('KEPALA KELUARGA') ||
+              upper.contains('NAMA KEPALA'))) {
+        namaKepalaKeluarga = _cleanValue(
+            line, ['NAMA KEPALA KELUARGA', 'KEPALA KELUARGA', 'NAMA KEPALA']);
+        if ((namaKepalaKeluarga == null || namaKepalaKeluarga.isEmpty) &&
+            i + 1 < lines.length) {
           final next = lines[i + 1].trim();
           if (!_isKeywordLine(next)) {
             namaKepalaKeluarga = _cleanValue(next, []);
@@ -294,12 +300,17 @@ class KkExtractorHelper {
       }
 
       // Alamat
-      if (alamat == null && upper.contains('ALAMAT') && !upper.contains('EMAIL')) {
+      if (alamat == null &&
+          upper.contains('ALAMAT') &&
+          !upper.contains('EMAIL')) {
         alamat = _cleanValue(line, ['ALAMAT']);
       }
 
       // RT / RW
-      if ((rt == null || rw == null) && (upper.contains('RT/RW') || upper.contains('RT / RW') || upper.contains('RT'))) {
+      if ((rt == null || rw == null) &&
+          (upper.contains('RT/RW') ||
+              upper.contains('RT / RW') ||
+              upper.contains('RT'))) {
         final match = RegExp(r'(\d{1,3})\s*[/]\s*(\d{1,3})').firstMatch(line);
         if (match != null) {
           rt = match.group(1);
@@ -308,8 +319,10 @@ class KkExtractorHelper {
       }
 
       // Desa / Kelurahan
-      if (desaKelurahan == null && (upper.contains('DESA') || upper.contains('KELURAHAN'))) {
-        desaKelurahan = _cleanValue(line, ['DESA/KELURAHAN', 'KELURAHAN/DESA', 'DESA', 'KELURAHAN']);
+      if (desaKelurahan == null &&
+          (upper.contains('DESA') || upper.contains('KELURAHAN'))) {
+        desaKelurahan = _cleanValue(
+            line, ['DESA/KELURAHAN', 'KELURAHAN/DESA', 'DESA', 'KELURAHAN']);
       }
 
       // Kecamatan
@@ -318,8 +331,10 @@ class KkExtractorHelper {
       }
 
       // Kabupaten / Kota
-      if (kabupatenKota == null && (upper.contains('KABUPATEN') || upper.contains('KOTA'))) {
-        kabupatenKota = _cleanValue(line, ['KABUPATEN/KOTA', 'KABUPATEN', 'KOTA', 'KAB.']);
+      if (kabupatenKota == null &&
+          (upper.contains('KABUPATEN') || upper.contains('KOTA'))) {
+        kabupatenKota =
+            _cleanValue(line, ['KABUPATEN/KOTA', 'KABUPATEN', 'KOTA', 'KAB.']);
       }
 
       // Provinsi
@@ -357,14 +372,21 @@ class KkExtractorHelper {
             final withoutNik = line.replaceAll(nik, '');
             final words = withoutNik
                 .replaceAll(RegExp(r'^\s*\d+[\s.]*'), '') // remove row number
-                .replaceAll(RegExp(r'LAKI-LAKI|PEREMPUAN|ISLAM|KRISTEN|KATOLIK|HINDU|BUDDHA', caseSensitive: false), '')
+                .replaceAll(
+                    RegExp(
+                        r'LAKI-LAKI|PEREMPUAN|ISLAM|KRISTEN|KATOLIK|HINDU|BUDDHA',
+                        caseSensitive: false),
+                    '')
                 .replaceAll(RegExp(r'[:=/\-]'), ' ')
                 .trim();
 
             if (words.length >= 3 && !_isKeywordLine(words)) {
               memberName = words.replaceAll(RegExp(r'\s+'), ' ');
             } else if (i > 0) {
-              final prevWords = lines[i - 1].replaceAll(RegExp(r'\d'), '').replaceAll(RegExp(r'[:=/\-]'), '').trim();
+              final prevWords = lines[i - 1]
+                  .replaceAll(RegExp(r'\d'), '')
+                  .replaceAll(RegExp(r'[:=/\-]'), '')
+                  .trim();
               if (prevWords.length >= 3 && !_isKeywordLine(prevWords)) {
                 memberName = prevWords;
               }
@@ -422,9 +444,13 @@ class KkExtractorHelper {
   static String? _cleanValue(String line, List<String> labels) {
     String cleaned = line;
     for (final label in labels) {
-      cleaned = cleaned.replaceAll(RegExp(RegExp.escape(label), caseSensitive: false), '');
+      cleaned = cleaned.replaceAll(
+          RegExp(RegExp.escape(label), caseSensitive: false), '');
     }
-    cleaned = cleaned.replaceAll(RegExp(r'^[:\-=.\s]+'), '').replaceAll(RegExp(r'[:\-=.\s]+$'), '').trim();
+    cleaned = cleaned
+        .replaceAll(RegExp(r'^[:\-=.\s]+'), '')
+        .replaceAll(RegExp(r'[:\-=.\s]+$'), '')
+        .trim();
     return cleaned.isNotEmpty ? cleaned : null;
   }
 

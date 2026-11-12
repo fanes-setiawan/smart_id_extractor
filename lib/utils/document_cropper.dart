@@ -99,7 +99,8 @@ class DocumentCropper {
 
       switch (type) {
         case SmartDocumentType.ktp:
-          // KTP has profile photo on the right: text spans ~85% of height and ~75% of width
+        case SmartDocumentType.sim:
+          // KTP and SIM are ID-1 standard cards with profile photo on the right
           padX = textW * 0.18;
           padY = textH * 0.14;
           break;

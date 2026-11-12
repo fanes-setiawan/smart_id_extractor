@@ -66,7 +66,7 @@ class SuratSehatExtractorHelper {
         (upper.contains('SURAT') && upper.contains('SEHAT'));
 
     if (options.requireHeader && !hasHeader) {
-      missingRequirements.add("Header 'Surat Keterangan Sehat/Dokter' tidak ditemukan.");
+      missingRequirements.add("Foto yang Anda unggah bukan dokumen Surat Keterangan Sehat. Pastikan judul surat dan instansi kesehatan terbaca jelas.");
     }
 
     // 2. Doctor / Examiner Detection
@@ -77,7 +77,7 @@ class SuratSehatExtractorHelper {
         upper.contains('NIP');
 
     if (options.requireDokter && !hasDokter) {
-      missingRequirements.add("Informasi dokter pemeriksa / NIP / SIP tidak ditemukan.");
+      missingRequirements.add("Tanda tangan dokter pemeriksa / SIP tidak terdeteksi pada Surat Sehat.");
     }
 
     // 3. Health Facility Detection
@@ -90,7 +90,7 @@ class SuratSehatExtractorHelper {
         upper.contains('LABORATORIUM');
 
     if (options.requireFaskes && !hasFaskes) {
-      missingRequirements.add("Identitas fasilitas kesehatan (RS / Puskesmas / Klinik) tidak ditemukan.");
+      missingRequirements.add("Identitas fasilitas kesehatan (RS / Puskesmas / Klinik) tidak terdeteksi jelas.");
     }
 
     // 4. Physical Examination Metrics Detection
@@ -104,7 +104,7 @@ class SuratSehatExtractorHelper {
         upper.contains('PEMERIKSAAN FISIK');
 
     if (options.requirePemeriksaanFisik && !hasPemeriksaanFisik) {
-      missingRequirements.add("Rincian pemeriksaan fisik (Tinggi/Berat/Tensi) tidak ditemukan.");
+      missingRequirements.add("Rincian hasil pemeriksaan fisik tidak terdeteksi pada dokumen.");
     }
 
     // 5. Keyword Matching

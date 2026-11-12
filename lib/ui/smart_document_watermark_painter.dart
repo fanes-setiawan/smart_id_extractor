@@ -43,6 +43,9 @@ class SmartDocumentWatermarkPainter extends CustomPainter {
         case SmartDocumentType.ktp:
           _drawKtpWatermark(canvas, size, rrect);
           break;
+        case SmartDocumentType.sim:
+          _drawSimWatermark(canvas, size, rrect);
+          break;
         case SmartDocumentType.kartuKeluarga:
           _drawKkWatermark(canvas, size, rrect);
           break;
@@ -230,6 +233,133 @@ class SmartDocumentWatermarkPainter extends CustomPainter {
     bottomR.paint(
       canvas,
       Offset(size.width - bottomR.width - (size.width * 0.08), size.height * 0.86),
+    );
+  }
+
+  void _drawSimWatermark(Canvas canvas, Size size, RRect rrect) {
+    // 1. Semi-translucent card body tint (Soft light blue-gray)
+    final Paint cardBgPaint = Paint()
+      ..color = const Color(0xFF88A8C8).withOpacity(0.38)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(rrect, cardBgPaint);
+
+    // 2. SIM Header: "SURAT IZIN MENGEMUDI" & "DRIVING LICENSE"
+    final TextPainter headerPainter = TextPainter(
+      text: const TextSpan(
+        text: 'SURAT IZIN MENGEMUDI\n',
+        style: TextStyle(
+          color: Color(0xFF1E3A5F),
+          fontSize: 9.0,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.1,
+          height: 1.2,
+        ),
+        children: [
+          TextSpan(
+            text: 'DRIVING LICENSE',
+            style: TextStyle(
+              color: Color(0xFF2C4A6F),
+              fontSize: 6.8,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
+      ),
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: size.width);
+
+    headerPainter.paint(
+      canvas,
+      Offset((size.width - headerPainter.width) / 2, size.height * 0.08),
+    );
+
+    // 3. Golongan SIM Badge (Top Right Badge e.g. "A" or "C")
+    final double badgeRight = size.width * 0.90;
+    final double badgeTop = size.height * 0.07;
+    final Rect badgeRect = Rect.fromLTWH(badgeRight - 22.0, badgeTop, 20.0, 20.0);
+    final Paint badgePaint = Paint()
+      ..color = const Color(0xFF1E3A5F).withOpacity(0.20)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, const Radius.circular(5.0)), badgePaint);
+
+    final TextPainter badgeText = TextPainter(
+      text: const TextSpan(
+        text: 'A',
+        style: TextStyle(
+          color: Color(0xFF1E3A5F),
+          fontSize: 11.0,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    badgeText.paint(
+      canvas,
+      Offset(
+        badgeRect.left + (badgeRect.width - badgeText.width) / 2,
+        badgeRect.top + (badgeRect.height - badgeText.height) / 2,
+      ),
+    );
+
+    // 4. Placeholder text lines on left side
+    final Paint linePaint = Paint()
+      ..color = const Color(0xFF1E3A5F).withOpacity(0.35)
+      ..strokeWidth = 2.4
+      ..strokeCap = StrokeCap.round;
+
+    final double leftMargin = size.width * 0.08;
+    final List<double> lineWidths = [
+      size.width * 0.42,
+      size.width * 0.48,
+      size.width * 0.45,
+      size.width * 0.38,
+      size.width * 0.44,
+      size.width * 0.35,
+    ];
+
+    double currentY = size.height * 0.30;
+    for (int i = 0; i < lineWidths.length; i++) {
+      canvas.drawLine(
+        Offset(leftMargin, currentY),
+        Offset(leftMargin + lineWidths[i], currentY),
+        linePaint,
+      );
+      currentY += size.height * 0.085;
+    }
+
+    // 5. Profile Photo Box (Right side ~68% to 92% width)
+    final double photoLeft = size.width * 0.67;
+    final double photoTop = size.height * 0.28;
+    final double photoWidth = size.width * 0.24;
+    final double photoHeight = size.height * 0.52;
+
+    final Rect photoRect = Rect.fromLTWH(photoLeft, photoTop, photoWidth, photoHeight);
+    final RRect photoRRect = RRect.fromRectAndRadius(photoRect, const Radius.circular(8.0));
+
+    // Photo background
+    final Paint photoBg = Paint()
+      ..color = const Color(0xFF1E3A5F).withOpacity(0.22)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(photoRRect, photoBg);
+
+    // Photo border
+    final Paint photoBorder = Paint()
+      ..color = Colors.white.withOpacity(0.60)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    canvas.drawRRect(photoRRect, photoBorder);
+
+    // Avatar icon inside photo
+    final Paint avatarPaint = Paint()
+      ..color = Colors.white.withOpacity(0.85)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawCircle(
+      Offset(photoLeft + photoWidth / 2, photoTop + photoHeight * 0.38),
+      7.0,
+      avatarPaint,
     );
   }
 

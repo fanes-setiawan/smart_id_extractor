@@ -8,8 +8,8 @@ import '../models/smart_document_type.dart';
 /// Features:
 /// - Label: "TAHAPAN BERKAS" (Amber / Orange `#FD990F`)
 /// - Badge chip on the right (e.g. "Kartu Keluarga", "Kartu Tanda Penduduk", "Surat Keterangan Sehat")
-/// - 3-Segment Progress indicators (Solid dark blue for completed/current, light grey for pending)
-/// - Step labels: `1. KTP` (with checkmark if completed), `2. KK`, `3. Surat Sehat`.
+/// - 4-Segment Progress indicators (Solid dark blue for completed/current, light grey for pending)
+/// - Step labels: `1. KTP`, `2. KK`, `3. SIM`, `4. Surat Sehat`.
 class SmartDocumentStepperHeader extends StatelessWidget {
   /// The active document type for this screen.
   final SmartDocumentType activeType;
@@ -42,8 +42,10 @@ class SmartDocumentStepperHeader extends StatelessWidget {
         return 1;
       case SmartDocumentType.kartuKeluarga:
         return 2;
-      case SmartDocumentType.suratSehat:
+      case SmartDocumentType.sim:
         return 3;
+      case SmartDocumentType.suratSehat:
+        return 4;
     }
   }
 
@@ -96,7 +98,7 @@ class SmartDocumentStepperHeader extends StatelessWidget {
 
           SizedBox(height: 12.h),
 
-          // Row 2: 3 Progress Bars
+          // Row 2: 4 Progress Bars (KTP -> KK -> SIM -> Surat Sehat)
           Row(
             children: [
               Expanded(
@@ -105,18 +107,25 @@ class SmartDocumentStepperHeader extends StatelessWidget {
                   isCurrentOrange: step == 1,
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: 6.w),
               Expanded(
                 child: _buildProgressBar(
                   isActiveOrDone: step >= 2 || completedSteps.contains(2),
                   isCurrentOrange: step == 2 && activeType == SmartDocumentType.kartuKeluarga,
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: 6.w),
               Expanded(
                 child: _buildProgressBar(
                   isActiveOrDone: step >= 3 || completedSteps.contains(3),
-                  isCurrentOrange: step == 3 && activeType == SmartDocumentType.suratSehat,
+                  isCurrentOrange: step == 3 && activeType == SmartDocumentType.sim,
+                ),
+              ),
+              SizedBox(width: 6.w),
+              Expanded(
+                child: _buildProgressBar(
+                  isActiveOrDone: step >= 4 || completedSteps.contains(4),
+                  isCurrentOrange: step == 4 && activeType == SmartDocumentType.suratSehat,
                 ),
               ),
             ],
@@ -124,7 +133,7 @@ class SmartDocumentStepperHeader extends StatelessWidget {
 
           SizedBox(height: 10.h),
 
-          // Row 3: Step Titles ("1. KTP", "2. KK", "3. Surat Sehat")
+          // Row 3: Step Titles ("1. KTP", "2. KK", "3. SIM", "4. Surat Sehat")
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -149,10 +158,19 @@ class SmartDocumentStepperHeader extends StatelessWidget {
               Expanded(
                 child: _buildStepLabel(
                   stepNum: 3,
-                  label: '3. Surat Sehat',
-                  type: SmartDocumentType.suratSehat,
+                  label: '3. SIM',
+                  type: SmartDocumentType.sim,
                   isCurrent: step == 3,
-                  isCompleted: completedSteps.contains(3),
+                  isCompleted: completedSteps.contains(3) || step > 3,
+                ),
+              ),
+              Expanded(
+                child: _buildStepLabel(
+                  stepNum: 4,
+                  label: '4. Surat Sehat',
+                  type: SmartDocumentType.suratSehat,
+                  isCurrent: step == 4,
+                  isCompleted: completedSteps.contains(4),
                 ),
               ),
             ],
@@ -209,7 +227,7 @@ class SmartDocumentStepperHeader extends StatelessWidget {
           ),
           alignment: Alignment.center,
           child: Text(
-            '3',
+            '4',
             style: TextStyle(
               fontFamily: 'PlusJakartaSans',
               color: Colors.white,

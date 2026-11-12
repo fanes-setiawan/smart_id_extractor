@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import 'kartu_keluarga_model.dart';
 import 'kartu_keluarga_validation.dart';
 import 'ktp_model.dart';
+import 'sim_validation.dart';
 import 'surat_sehat_model.dart';
 import 'surat_sehat_validation.dart';
 
@@ -11,6 +12,9 @@ import 'surat_sehat_validation.dart';
 enum SmartDocumentType {
   /// Kartu Tanda Penduduk (e-KTP)
   ktp,
+
+  /// Surat Izin Mengemudi (SIM)
+  sim,
 
   /// Kartu Keluarga (KK)
   kartuKeluarga,
@@ -26,6 +30,8 @@ extension SmartDocumentTypeX on SmartDocumentType {
     switch (this) {
       case SmartDocumentType.ktp:
         return 'Upload Berkas KTP';
+      case SmartDocumentType.sim:
+        return 'Upload Berkas SIM';
       case SmartDocumentType.kartuKeluarga:
         return 'Upload Berkas (KK)';
       case SmartDocumentType.suratSehat:
@@ -38,6 +44,8 @@ extension SmartDocumentTypeX on SmartDocumentType {
     switch (this) {
       case SmartDocumentType.ktp:
         return 'Kartu Tanda Penduduk';
+      case SmartDocumentType.sim:
+        return 'Surat Izin Mengemudi';
       case SmartDocumentType.kartuKeluarga:
         return 'Kartu Keluarga';
       case SmartDocumentType.suratSehat:
@@ -50,6 +58,8 @@ extension SmartDocumentTypeX on SmartDocumentType {
     switch (this) {
       case SmartDocumentType.ktp:
         return 'Tepatkan seluruh kartu KTP di dalam bingkai';
+      case SmartDocumentType.sim:
+        return 'Tepatkan seluruh kartu SIM di dalam bingkai';
       case SmartDocumentType.kartuKeluarga:
         return 'Tepatkan seluruh lembar Kartu Keluarga di dalam bingkai';
       case SmartDocumentType.suratSehat:
@@ -65,6 +75,8 @@ extension SmartDocumentTypeX on SmartDocumentType {
     switch (this) {
       case SmartDocumentType.ktp:
         return 'Panduan Pemindaian Cepat & Presisi';
+      case SmartDocumentType.sim:
+        return 'Panduan Pemindaian Kartu SIM';
       case SmartDocumentType.kartuKeluarga:
         return 'Panduan Pemindaian Lembar KK';
       case SmartDocumentType.suratSehat:
@@ -79,6 +91,12 @@ extension SmartDocumentTypeX on SmartDocumentType {
         return const [
           'Hindari pantulan cahaya langsung atau kilau flash pada permukaan e-KTP',
           'Letakkan kartu di atas permukaan datar berlatar belakang kontras/gelap',
+        ];
+      case SmartDocumentType.sim:
+        return const [
+          'Pastikan seluruh fisik kartu SIM asli berada dalam bingkai foto.',
+          'Judul SURAT IZIN MENGEMUDI dan data identitas terbaca jelas tanpa blur.',
+          'Hindari pantulan kilatan cahaya lampu pada lapisan plastik kartu SIM.',
         ];
       case SmartDocumentType.kartuKeluarga:
         return const [
@@ -99,6 +117,7 @@ extension SmartDocumentTypeX on SmartDocumentType {
   double get aspectRatio {
     switch (this) {
       case SmartDocumentType.ktp:
+      case SmartDocumentType.sim:
         return 1.5858; // ID-1 standard landscape (85.6mm x 53.98mm)
       case SmartDocumentType.kartuKeluarga:
         return 1.4142; // Standard A4 landscape (~340w / 240h)
@@ -111,6 +130,7 @@ extension SmartDocumentTypeX on SmartDocumentType {
   String get submitButtonLabel {
     switch (this) {
       case SmartDocumentType.ktp:
+      case SmartDocumentType.sim:
       case SmartDocumentType.kartuKeluarga:
         return 'Kirim';
       case SmartDocumentType.suratSehat:
@@ -145,6 +165,9 @@ class SmartDocumentResult extends Equatable {
   /// Detailed KK validation result (only present if [documentType] == [SmartDocumentType.kartuKeluarga]).
   final KartuKeluargaValidationResult? kkValidation;
 
+  /// Detailed SIM validation result (only present if [documentType] == [SmartDocumentType.sim]).
+  final SimValidationResult? simValidation;
+
   /// Extracted Surat Sehat model (only present if [documentType] == [SmartDocumentType.suratSehat]).
   final SuratSehatModel? suratSehatModel;
 
@@ -163,6 +186,7 @@ class SmartDocumentResult extends Equatable {
     this.ktpPhotoFile,
     this.kkModel,
     this.kkValidation,
+    this.simValidation,
     this.suratSehatModel,
     this.suratSehatValidation,
     this.errorMessage,
@@ -178,6 +202,7 @@ class SmartDocumentResult extends Equatable {
         ktpPhotoFile?.path,
         kkModel,
         kkValidation,
+        simValidation,
         suratSehatModel,
         suratSehatValidation,
         errorMessage,

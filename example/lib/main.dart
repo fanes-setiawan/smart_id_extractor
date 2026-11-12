@@ -90,6 +90,12 @@ class _MainScreenState extends State<MainScreen>
   SuratSehatValidationResult? _suratSehatValidationResult;
   bool _isProcessingSuratSehat = false;
 
+  File? _simImage;
+  SimValidationResult? _simValidationResult;
+  bool _requireSimHeader = true;
+  bool _requireSimGolongan = false;
+  bool _isProcessingSim = false;
+
   File? _passportImage;
   PassportModel? _passportModel;
   bool _isProcessingPassport = false;
@@ -97,7 +103,7 @@ class _MainScreenState extends State<MainScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -160,6 +166,17 @@ class _MainScreenState extends State<MainScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        Icon(Icons.drive_eta_rounded, size: 17),
+                        SizedBox(width: 6),
+                        Text('SIM'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    iconMargin: EdgeInsets.zero,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         Icon(Icons.family_restroom_rounded, size: 17),
                         SizedBox(width: 6),
                         Text('KK'),
@@ -198,6 +215,7 @@ class _MainScreenState extends State<MainScreen>
         controller: _tabController,
         children: [
           _buildKtpTab(),
+          _buildSimTab(),
           _buildKkTab(),
           _buildSuratSehatTab(),
           _buildPassportTab(),
@@ -261,7 +279,8 @@ class _MainScreenState extends State<MainScreen>
                     'Smart Document Camera',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  onPressed: () => _openSmartDocumentCamera(SmartDocumentType.ktp),
+                  onPressed: () =>
+                      _openSmartDocumentCamera(SmartDocumentType.ktp),
                 ),
                 const SizedBox(height: 8),
                 ElevatedButton.icon(
@@ -394,6 +413,193 @@ class _MainScreenState extends State<MainScreen>
         if (!_isProcessingKtp && _ktpModel != null) ...[
           const SizedBox(height: 16),
           _buildKtpResult(),
+        ],
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildSimTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (_simImage != null) ...[
+          _buildImagePreview(
+            imageFile: _simImage!,
+            onClear: () {
+              setState(() {
+                _simImage = null;
+                _simValidationResult = null;
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.drive_eta_rounded,
+                        color: Color(0xFF2563EB), size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Pindai SIM (Surat Izin Mengemudi)',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0B3866),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () =>
+                      _openSmartDocumentCamera(SmartDocumentType.sim),
+                  icon: const Icon(Icons.camera_alt_rounded, size: 20),
+                  label: const Text(
+                    'Buka Kamera Pintar SIM',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () => _getImage(ImageSource.gallery, 'sim'),
+                        icon: const Icon(Icons.photo_library_outlined,
+                            size: 18, color: Color(0xFF475569)),
+                        label: const Text(
+                          'Pilih Galeri',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF475569),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () => _getImage(ImageSource.camera, 'sim'),
+                        icon: const Icon(Icons.camera_rounded,
+                            size: 18, color: Color(0xFF475569)),
+                        label: const Text(
+                          'Ambil Kamera',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF475569),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.tune_rounded,
+                        color: Color(0xFF2563EB), size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Kriteria Validasi Kartu SIM',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Divider(color: Color(0xFFE2E8F0)),
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Wajib Judul SURAT IZIN MENGEMUDI',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Memastikan dokumen memiliki header resmi SIM / Driving License',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                  value: _requireSimHeader,
+                  onChanged: (val) {
+                    setState(() {
+                      _requireSimHeader = val;
+                    });
+                  },
+                ),
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Wajib Golongan SIM (A / B / C / D)',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Kategori kelas SIM harus berhasil terdeteksi',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                  value: _requireSimGolongan,
+                  onChanged: (val) {
+                    setState(() {
+                      _requireSimGolongan = val;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_isProcessingSim)
+          _buildLoadingIndicator('Memvalidasi Kartu SIM...'),
+        if (!_isProcessingSim && _simValidationResult != null) ...[
+          const SizedBox(height: 16),
+          _buildSimResult(),
         ],
         const SizedBox(height: 32),
       ],
@@ -537,7 +743,8 @@ class _MainScreenState extends State<MainScreen>
                     'Buka Kamera KK',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  onPressed: () => _openSmartDocumentCamera(SmartDocumentType.kartuKeluarga),
+                  onPressed: () =>
+                      _openSmartDocumentCamera(SmartDocumentType.kartuKeluarga),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -694,7 +901,8 @@ class _MainScreenState extends State<MainScreen>
         ),
         if (_isProcessingSuratSehat)
           _buildLoadingIndicator('Memvalidasi Surat Keterangan Sehat...'),
-        if (!_isProcessingSuratSehat && _suratSehatValidationResult != null) ...[
+        if (!_isProcessingSuratSehat &&
+            _suratSehatValidationResult != null) ...[
           const SizedBox(height: 16),
           _buildSuratSehatResult(),
         ],
@@ -925,8 +1133,7 @@ class _MainScreenState extends State<MainScreen>
                               color: const Color(0xFF10B981), width: 1.5),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF10B981)
-                                  .withOpacity(0.12),
+                              color: const Color(0xFF10B981).withOpacity(0.12),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
@@ -950,8 +1157,8 @@ class _MainScreenState extends State<MainScreen>
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF10B981)
-                                    .withOpacity(0.12),
+                                color:
+                                    const Color(0xFF10B981).withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: const Text(
@@ -1136,6 +1343,164 @@ class _MainScreenState extends State<MainScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSimResult() {
+    final result = _simValidationResult!;
+    final isValid = result.isValid;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isValid ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color:
+                  isValid ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                isValid ? Icons.check_circle_rounded : Icons.cancel_outlined,
+                color:
+                    isValid ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isValid
+                          ? 'DOKUMEN VALID SURAT IZIN MENGEMUDI (SIM)'
+                          : 'BUKAN KARTU SIM / TIDAK VALID',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isValid
+                            ? const Color(0xFF047857)
+                            : const Color(0xFFB91C1C),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tingkat Keyakinan: ${(result.confidence * 100).toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    if (result.golongan != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Golongan SIM: ${result.golongan}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (result.missingRequirements.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        color: Color(0xFFD97706), size: 18),
+                    SizedBox(width: 6),
+                    Text(
+                      'Kriteria yang belum terpenuhi:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                for (final item in result.missingRequirements)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 2),
+                    child: Text(
+                      '• $item',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF78350F),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.verified_user_rounded,
+                        color: Color(0xFFFD990F), size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Hasil Validasi SIM',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(color: Color(0xFFE2E8F0)),
+                _buildDetailRow('Status Validasi',
+                    isValid ? 'VALID (SIM ASLI)' : 'TIDAK VALID',
+                    isBold: true),
+                _buildDetailRow(
+                    'Golongan SIM', result.golongan ?? 'Tidak terdeteksi',
+                    isBold: result.hasGolongan),
+                _buildDetailRow(
+                    'Nomor SIM', result.nomorSim ?? 'Tidak terdeteksi'),
+                _buildDetailRow('Header Ditemukan',
+                    result.hasHeader ? 'Ya ("SURAT IZIN MENGEMUDI")' : 'Tidak'),
+                _buildDetailRow('Jumlah Keyword Cocok',
+                    '${result.matchedKeywordsCount} kata kunci'),
+                if (result.matchedKeywords.isNotEmpty)
+                  _buildDetailRow('Kata Kunci Terdeteksi',
+                      result.matchedKeywords.join(', ')),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1369,14 +1734,16 @@ class _MainScreenState extends State<MainScreen>
             color: isValid ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isValid ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
+              color:
+                  isValid ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
             ),
           ),
           child: Row(
             children: [
               Icon(
                 isValid ? Icons.check_circle_rounded : Icons.cancel_outlined,
-                color: isValid ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                color:
+                    isValid ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                 size: 28,
               ),
               const SizedBox(width: 12),
@@ -1391,7 +1758,9 @@ class _MainScreenState extends State<MainScreen>
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: isValid ? const Color(0xFF047857) : const Color(0xFFB91C1C),
+                        color: isValid
+                            ? const Color(0xFF047857)
+                            : const Color(0xFFB91C1C),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1488,7 +1857,8 @@ class _MainScreenState extends State<MainScreen>
                   ),
                   const SizedBox(height: 12),
                   const Divider(color: Color(0xFFE2E8F0)),
-                  _buildDetailRow('Fasilitas Kesehatan', model.namaFaskes, isBold: true),
+                  _buildDetailRow('Fasilitas Kesehatan', model.namaFaskes,
+                      isBold: true),
                   _buildDetailRow('Nama Pasien', model.nama, isBold: true),
                   _buildDetailRow('NIK', model.nik),
                   _buildDetailRow('Umur', model.umur),
@@ -1678,6 +2048,10 @@ class _MainScreenState extends State<MainScreen>
             _ktpPhoto = result.ktpPhotoFile;
             _ktpModel = result.ktpModel;
             break;
+          case SmartDocumentType.sim:
+            _simImage = result.imageFile;
+            _simValidationResult = result.simValidation;
+            break;
           case SmartDocumentType.kartuKeluarga:
             _kkImage = result.imageFile;
             _kkValidationResult = result.kkValidation;
@@ -1697,6 +2071,12 @@ class _MainScreenState extends State<MainScreen>
         _ktpImage = null;
         _ktpModel = null;
         _isProcessingKtp = true;
+      });
+    } else if (documentType == 'sim') {
+      setState(() {
+        _simImage = null;
+        _simValidationResult = null;
+        _isProcessingSim = true;
       });
     } else if (documentType == 'kk') {
       setState(() {
@@ -1729,6 +2109,7 @@ class _MainScreenState extends State<MainScreen>
     } else {
       setState(() {
         _isProcessingKtp = false;
+        _isProcessingSim = false;
         _isProcessingKk = false;
         _isProcessingSuratSehat = false;
         _isProcessingPassport = false;
@@ -1873,6 +2254,17 @@ class _MainScreenState extends State<MainScreen>
 
       _ktpModel = model;
       _isProcessingKtp = false;
+    } else if (documentType == 'sim') {
+      _simImage = originalFile;
+      final options = SimValidationOptions(
+        requireHeader: _requireSimHeader,
+        requireGolongan: _requireSimGolongan,
+      );
+      _simValidationResult = await KtpExtractor.validateSim(
+        originalFile,
+        options: options,
+      );
+      _isProcessingSim = false;
     } else if (documentType == 'kk') {
       _kkImage = originalFile;
       final options = KartuKeluargaValidationOptions(

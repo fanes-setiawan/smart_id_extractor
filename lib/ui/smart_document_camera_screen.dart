@@ -11,7 +11,9 @@ import 'package:image_picker/image_picker.dart';
 import '../ktp_extractor.dart';
 import '../utils/document_cropper.dart';
 import '../utils/kk_extractor_helper.dart';
+import '../utils/sim_extractor_helper.dart';
 import '../utils/surat_sehat_extractor_helper.dart';
+import 'custom_snackbar.dart';
 
 /// Comprehensive multi-document camera verification screen.
 ///
@@ -65,8 +67,14 @@ class SmartDocumentCameraScreen extends StatefulWidget {
   /// Custom Surat Sehat validation options (used only if [documentType] is [SmartDocumentType.suratSehat]).
   final SuratSehatValidationOptions suratSehatOptions;
 
+  /// Custom SIM validation options (used only if [documentType] is [SmartDocumentType.sim]).
+  final SimValidationOptions simOptions;
+
   /// Custom loading / accent color. Defaults to #FD990F (orange).
   final Color accentColor;
+
+  /// Custom icon or app logo to display inside the pill SnackBar.
+  final Widget? snackBarIcon;
 
   const SmartDocumentCameraScreen({
     super.key,
@@ -83,7 +91,9 @@ class SmartDocumentCameraScreen extends StatefulWidget {
     this.guidanceTips,
     this.kkOptions = const KartuKeluargaValidationOptions(),
     this.suratSehatOptions = const SuratSehatValidationOptions(),
+    this.simOptions = const SimValidationOptions(),
     this.accentColor = const Color(0xFFFD990F),
+    this.snackBarIcon,
   });
 
   @override
@@ -297,6 +307,9 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
         case SmartDocumentType.ktp:
           result = await _processKtp(imageFile);
           break;
+        case SmartDocumentType.sim:
+          result = await _processSim(imageFile);
+          break;
         case SmartDocumentType.kartuKeluarga:
           result = await _processKartuKeluarga(imageFile);
           break;
@@ -318,15 +331,11 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       if (!widget.showSubmitButton) {
         _returnResult(result);
       } else if (!result.isValid) {
-        // Show validation snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFFC02626),
-            content: Text(
-              result.errorMessage ?? 'Dokumen tidak valid atau kurang terbaca.',
-              style: const TextStyle(fontFamily: 'PlusJakartaSans', color: Colors.white),
-            ),
-          ),
+        // Show validation snackbar using exact styling from app-mobile-smartindopsiko
+        showCustomSnackBar(
+          context,
+          result.errorMessage ?? 'Foto yang Anda unggah tidak valid.',
+          customIcon: widget.snackBarIcon,
         );
       }
     } catch (e) {
@@ -361,8 +370,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
     final String? errorMessage = isValid
         ? null
         : (ktpModel.nik == null
-            ? 'NIK 16 digit tidak terdeteksi. Pastikan e-KTP berada di dalam bingkai.'
-            : 'Format NIK tidak valid (harus 16 digit).');
+            ? 'Foto yang Anda unggah bukan dokumen e-KTP yang valid. Pastikan fisik e-KTP berada di dalam bingkai dan NIK terbaca jelas.'
+            : 'Format NIK e-KTP tidak valid (harus 16 digit).');
 
     return SmartDocumentResult(
       documentType: SmartDocumentType.ktp,
@@ -373,6 +382,61 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       ktpPhotoFile: photoFile,
       errorMessage: errorMessage,
     );
+  }
+
+  Future<SmartDocumentResult> _processSim(File imageFile) async {
+    // 1. Crop ID-1 standard card
+    final File? croppedFile = await DocumentCropper.cropDocument(
+      imageFile,
+      SmartDocumentType.sim,
+    );
+    final File finalImage = croppedFile ?? imageFile;
+
+    // 2. OCR Text Recognition & SIM Validation
+    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    try {
+      final inputImage = InputImage.fromFile(finalImage);
+      final RecognizedText recognizedText =
+          await textRecognizer.processImage(inputImage);
+      final String rawText = recognizedText.text;
+
+      var validation = SimExtractorHelper.validateFromText(
+        rawText,
+        options: widget.simOptions,
+        recognizedText: recognizedText,
+      );
+
+      // Fallback ke full image jika crop terlalu ketat
+      if (!validation.isValid && croppedFile != null) {
+        final origInput = InputImage.fromFile(imageFile);
+        final origRecognized = await textRecognizer.processImage(origInput);
+        final origValidation = SimExtractorHelper.validateFromText(
+          origRecognized.text,
+          options: widget.simOptions,
+          recognizedText: origRecognized,
+        );
+        if (origValidation.isValid) {
+          validation = origValidation;
+        }
+      }
+
+      final String? errorMsg = validation.isValid
+          ? null
+          : (validation.missingRequirements.isNotEmpty
+              ? validation.missingRequirements.first
+              : 'Foto yang Anda unggah bukan dokumen SIM. Pastikan fisik kartu SIM asli berada di dalam bingkai.');
+
+      return SmartDocumentResult(
+        documentType: SmartDocumentType.sim,
+        imageFile: finalImage,
+        isValid: validation.isValid,
+        rawText: rawText,
+        simValidation: validation,
+        errorMessage: errorMsg,
+      );
+    } finally {
+      textRecognizer.close();
+    }
   }
 
   Future<SmartDocumentResult> _processKartuKeluarga(File imageFile) async {
@@ -413,7 +477,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
           ? null
           : (validation.missingRequirements.isNotEmpty
               ? validation.missingRequirements.first
-              : 'Format Kartu Keluarga tidak valid atau kurang terbaca.');
+              : 'Foto yang Anda unggah bukan dokumen Kartu Keluarga (KK). Pastikan seluruh lembar fisik KK asli berada di dalam bingkai.');
 
       return SmartDocumentResult(
         documentType: SmartDocumentType.kartuKeluarga,
@@ -467,7 +531,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
           ? null
           : (validation.missingRequirements.isNotEmpty
               ? validation.missingRequirements.first
-              : 'Surat Keterangan Sehat tidak memenuhi kriteria verifikasi.');
+              : 'Foto yang Anda unggah bukan dokumen Surat Keterangan Sehat. Pastikan lembar fisik asli dari faskes berada di dalam bingkai.');
 
       return SmartDocumentResult(
         documentType: SmartDocumentType.suratSehat,

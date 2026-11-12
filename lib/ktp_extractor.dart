@@ -12,11 +12,13 @@ import 'models/kartu_keluarga_model.dart';
 import 'models/kartu_keluarga_validation.dart';
 import 'models/ktp_model.dart';
 import 'models/passport_model.dart';
+import 'models/sim_validation.dart';
 import 'models/smart_document_type.dart';
 import 'models/surat_sehat_model.dart';
 import 'models/surat_sehat_validation.dart';
 import 'utils/document_cropper.dart';
 import 'utils/kk_extractor_helper.dart';
+import 'utils/sim_extractor_helper.dart';
 import 'utils/surat_sehat_extractor_helper.dart';
 
 export 'models/kartu_keluarga_model.dart';
@@ -24,9 +26,11 @@ export 'models/kartu_keluarga_validation.dart';
 export 'models/ktp_camera_result.dart';
 export 'models/ktp_model.dart';
 export 'models/passport_model.dart';
+export 'models/sim_validation.dart';
 export 'models/smart_document_type.dart';
 export 'models/surat_sehat_model.dart';
 export 'models/surat_sehat_validation.dart';
+export 'ui/custom_snackbar.dart';
 export 'ui/ktp_camera_screen.dart';
 export 'ui/smart_document_camera_screen.dart';
 export 'ui/smart_document_stepper_header.dart';
@@ -1385,6 +1389,55 @@ class KtpExtractor {
   /// Extracts structured data from raw Surat Keterangan Sehat OCR text.
   static SuratSehatModel extractSuratSehatFromText(String rawText) {
     return SuratSehatExtractorHelper.parseFromText(rawText);
+  }
+
+  // ===========================================================================
+  // SIM (SURAT IZIN MENGEMUDI) VALIDATION METHODS
+  // ===========================================================================
+
+  /// Validates whether an image file is an authentic Indonesian SIM (Surat Izin Mengemudi).
+  static Future<SimValidationResult> validateSim(
+    File imageFile, {
+    SimValidationOptions options = const SimValidationOptions(),
+  }) async {
+    final inputImage = InputImage.fromFile(imageFile);
+    final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    try {
+      final recognizedText = await recognizer.processImage(inputImage);
+      return SimExtractorHelper.validateFromText(
+        recognizedText.text,
+        options: options,
+        recognizedText: recognizedText,
+      );
+    } finally {
+      await recognizer.close();
+    }
+  }
+
+  /// Validates whether a raw OCR text belongs to an authentic Indonesian SIM.
+  static SimValidationResult validateSimFromText(
+    String rawText, {
+    SimValidationOptions options = const SimValidationOptions(),
+  }) {
+    return SimExtractorHelper.validateFromText(rawText, options: options);
+  }
+
+  /// Convenience boolean check to quickly verify if an image is a SIM card.
+  static Future<bool> isSim(
+    File imageFile, {
+    bool requireHeader = true,
+    bool requireGolongan = false,
+    int minKeywordMatches = 2,
+  }) async {
+    final result = await validateSim(
+      imageFile,
+      options: SimValidationOptions(
+        requireHeader: requireHeader,
+        requireGolongan: requireGolongan,
+        minKeywordMatches: minKeywordMatches,
+      ),
+    );
+    return result.isValid;
   }
 }
 
