@@ -7,12 +7,11 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
-
-import '../ktp_extractor.dart';
-import '../utils/document_cropper.dart';
-import '../utils/kk_extractor_helper.dart';
-import '../utils/sim_extractor_helper.dart';
-import '../utils/surat_sehat_extractor_helper.dart';
+import 'package:smart_id_extractor/ktp_extractor.dart';
+import 'package:smart_id_extractor/utils/document_cropper.dart';
+import 'package:smart_id_extractor/utils/kk_extractor_helper.dart';
+import 'package:smart_id_extractor/utils/sim_extractor_helper.dart';
+import 'package:smart_id_extractor/utils/surat_sehat_extractor_helper.dart';
 
 /// Comprehensive multi-document camera verification screen.
 ///
@@ -96,7 +95,8 @@ class SmartDocumentCameraScreen extends StatefulWidget {
   });
 
   @override
-  State<SmartDocumentCameraScreen> createState() => _SmartDocumentCameraScreenState();
+  State<SmartDocumentCameraScreen> createState() =>
+      _SmartDocumentCameraScreenState();
 }
 
 class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
@@ -199,7 +199,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   Future<void> _toggleFlash() async {
     if (_controller == null || !_controller!.value.isInitialized) return;
     try {
-      final newMode = _flashMode == FlashMode.off ? FlashMode.torch : FlashMode.off;
+      final newMode =
+          _flashMode == FlashMode.off ? FlashMode.torch : FlashMode.off;
       await _controller!.setFlashMode(newMode);
       if (mounted) {
         setState(() {
@@ -218,7 +219,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_controller == null || !_controller!.value.isInitialized) return;
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
       _controller?.dispose();
       _controller = null;
     } else if (state == AppLifecycleState.resumed) {
@@ -244,7 +246,9 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   // ---------------------------------------------------------------------------
 
   Future<void> _captureFromCamera() async {
-    if (_controller == null || !_controller!.value.isInitialized || _isProcessing) return;
+    if (_controller == null ||
+        !_controller!.value.isInitialized ||
+        _isProcessing) return;
 
     try {
       setState(() {
@@ -449,7 +453,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       final inputImage = InputImage.fromFile(finalImage);
-      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      final RecognizedText recognizedText =
+          await textRecognizer.processImage(inputImage);
       final String rawText = recognizedText.text;
 
       var validation = KkExtractorHelper.validateFromText(
@@ -503,7 +508,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
       final inputImage = InputImage.fromFile(finalImage);
-      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      final RecognizedText recognizedText =
+          await textRecognizer.processImage(inputImage);
       final String rawText = recognizedText.text;
 
       var validation = SuratSehatExtractorHelper.validateFromText(
@@ -633,7 +639,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                         children: [
                           _buildShutterRow(),
                           // Tombol kirim hanya muncul jika dokumen sudah diambil/dipilih
-                          if (widget.showSubmitButton && _capturedImageFile != null) ...[
+                          if (widget.showSubmitButton &&
+                              _capturedImageFile != null) ...[
                             SizedBox(height: 10.h),
                             _buildSubmitButton(),
                           ],
@@ -668,7 +675,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                           width: 32.r,
                           height: 32.r,
                           child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(widget.accentColor),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                widget.accentColor),
                             strokeWidth: 3.2,
                           ),
                         ),
@@ -719,8 +727,11 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   Widget _buildViewfinder() {
     // Determine card dimensions based on document aspect ratio
     final double cardWidth = 350.w;
-    final double cardHeight = widget.documentType == SmartDocumentType.suratSehat
-        ? (cardWidth / 1.15).clamp(260.0, 300.0).h // Portrait A4 box dibuat proporsional agar seluruh halaman pas tanpa scroll
+    final double cardHeight = widget.documentType ==
+            SmartDocumentType.suratSehat
+        ? (cardWidth / 1.15)
+            .clamp(260.0, 300.0)
+            .h // Portrait A4 box dibuat proporsional agar seluruh halaman pas tanpa scroll
         : (cardWidth / widget.documentType.aspectRatio);
 
     final bool isCameraActive =
@@ -762,11 +773,14 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                       GestureDetector(
                         onTapDown: (TapDownDetails details) async {
                           final controller = _controller;
-                          if (controller == null || !controller.value.isInitialized) return;
+                          if (controller == null ||
+                              !controller.value.isInitialized) return;
                           try {
                             final offset = Offset(
-                              (details.localPosition.dx / cardWidth).clamp(0.0, 1.0),
-                              (details.localPosition.dy / cardHeight).clamp(0.0, 1.0),
+                              (details.localPosition.dx / cardWidth)
+                                  .clamp(0.0, 1.0),
+                              (details.localPosition.dy / cardHeight)
+                                  .clamp(0.0, 1.0),
                             );
                             await controller.setFocusPoint(offset);
                             await controller.setFocusMode(FocusMode.auto);
@@ -775,8 +789,10 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                         child: FittedBox(
                           fit: BoxFit.cover,
                           child: SizedBox(
-                            width: _controller!.value.previewSize?.height ?? cardWidth,
-                            height: _controller!.value.previewSize?.width ?? cardHeight,
+                            width: _controller!.value.previewSize?.height ??
+                                cardWidth,
+                            height: _controller!.value.previewSize?.width ??
+                                cardHeight,
                             child: CameraPreview(_controller!),
                           ),
                         ),
@@ -786,7 +802,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                         color: const Color(0xFF111C2D),
                         child: Center(
                           child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(widget.accentColor),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                widget.accentColor),
                             strokeWidth: 2.5,
                           ),
                         ),
@@ -1091,12 +1108,12 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
           else
             SizedBox(width: 60.w),
 
-          // Center: Circular Orange Shutter Button & Label
+          // Center: Circular Orange Shutter Button & Label (Changes to "Ulangi" when photo is filled)
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               GestureDetector(
-                onTap: _captureFromCamera,
+                onTap: _capturedImageFile != null ? _retakePhoto : _captureFromCamera,
                 child: Container(
                   width: 74.r,
                   height: 74.r,
@@ -1121,22 +1138,28 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                       color: Color(0xFFFD990F),
                     ),
                     alignment: Alignment.center,
-                    child: SvgPicture.asset(
-                      'assets/icons/ic_camera.svg',
-                      package: 'smart_id_extractor',
-                      width: 26.r,
-                      height: 26.r,
-                      colorFilter: const ColorFilter.mode(
-                        Colors.white,
-                        BlendMode.srcIn,
-                      ),
-                    ),
+                    child: _capturedImageFile != null
+                        ? Icon(
+                            Icons.refresh_rounded,
+                            size: 30.r,
+                            color: Colors.white,
+                          )
+                        : SvgPicture.asset(
+                            'assets/icons/ic_camera.svg',
+                            package: 'smart_id_extractor',
+                            width: 26.r,
+                            height: 26.r,
+                            colorFilter: const ColorFilter.mode(
+                              Colors.white,
+                              BlendMode.srcIn,
+                            ),
+                          ),
                   ),
                 ),
               ),
               SizedBox(height: 6.h),
               Text(
-                widget.documentType.shutterLabel,
+                _capturedImageFile != null ? 'Ulangi' : widget.documentType.shutterLabel,
                 style: TextStyle(
                   fontFamily: 'PlusJakartaSans',
                   color: const Color(0xFF0B3866),
@@ -1155,7 +1178,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
   }
 
   Widget _buildSubmitButton() {
-    final String label = widget.submitButtonLabel ?? widget.documentType.submitButtonLabel;
+    final String label =
+        widget.submitButtonLabel ?? widget.documentType.submitButtonLabel;
     final bool canSubmit = _latestResult != null && _latestResult!.isValid;
 
     return Padding(
@@ -1176,7 +1200,8 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (widget.documentType == SmartDocumentType.suratSehat) ...[
-                Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 18.sp),
+                Icon(Icons.check_circle_outline_rounded,
+                    color: Colors.white, size: 18.sp),
                 SizedBox(width: 8.w),
               ],
               Text(

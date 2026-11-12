@@ -123,7 +123,7 @@ class SuratSehatExtractorHelper {
 
     if (matchedKeywords.length < options.minKeywordMatches) {
       missingRequirements.add(
-        "Kurang kata kunci khas Surat Sehat: ditemukan ${matchedKeywords.length}, minimal ${options.minKeywordMatches}.",
+        "Foto yang Anda unggah bukan dokumen Surat Sehat yang valid. Silakan gunakan lembar dokumen fisik asli yang terbaca jelas.",
       );
     }
 

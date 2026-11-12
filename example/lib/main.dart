@@ -559,7 +559,7 @@ class _MainScreenState extends State<MainScreen>
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   title: const Text(
-                    'Wajib Judul SURAT IZIN MENGEMUDI',
+                    'Foto yang Anda unggah bukan dokumen SIM',
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                   subtitle: const Text(

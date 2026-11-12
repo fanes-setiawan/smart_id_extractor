@@ -63,7 +63,7 @@ class KkExtractorHelper {
 
     if (options.requireHeader && !hasHeader) {
       missingRequirements
-          .add("Judul 'KARTU KELUARGA' tidak ditemukan pada dokumen.");
+          .add("Foto yang Anda unggah bukan dokumen Kartu Keluarga (KK). Judul KARTU KELUARGA tidak ditemukan.");
     }
 
     // 2. Nomor KK Detection

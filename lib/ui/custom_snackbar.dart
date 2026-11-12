@@ -3,13 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-/// Displays a custom floating pill SnackBar matching the app-mobile-smartindopsiko design:
-/// - Transparent background with floating behavior.
-/// - Dark frosted pill container (`Color(0xFF1E1E1E).withOpacity(0.50)`).
-/// - Rounded corners (`30.r`) with soft drop shadow.
-/// - Leading app logo / icon container (24x24) with rounded corners (`8.r`).
-/// - PlusJakartaSans typography (`w400`, `13.sp`, white text).
-/// - Centered horizontally at the bottom.
 void showCustomSnackBar(
   BuildContext context,
   String message, {
@@ -84,4 +77,3 @@ void showCustomSnackBar(
     ),
   );
 }
-

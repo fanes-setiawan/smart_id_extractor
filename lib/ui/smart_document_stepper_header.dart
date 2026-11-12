@@ -103,29 +103,29 @@ class SmartDocumentStepperHeader extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildProgressBar(
-                  isActiveOrDone: step >= 1 || completedSteps.contains(1),
-                  isCurrentOrange: step == 1,
+                  isActiveOrDone: completedSteps.contains(1),
+                  isCurrentOrange: step == 1 && !completedSteps.contains(1),
                 ),
               ),
               SizedBox(width: 6.w),
               Expanded(
                 child: _buildProgressBar(
-                  isActiveOrDone: step >= 2 || completedSteps.contains(2),
-                  isCurrentOrange: step == 2 && activeType == SmartDocumentType.kartuKeluarga,
+                  isActiveOrDone: completedSteps.contains(2),
+                  isCurrentOrange: step == 2 && !completedSteps.contains(2),
                 ),
               ),
               SizedBox(width: 6.w),
               Expanded(
                 child: _buildProgressBar(
-                  isActiveOrDone: step >= 3 || completedSteps.contains(3),
-                  isCurrentOrange: step == 3 && activeType == SmartDocumentType.sim,
+                  isActiveOrDone: completedSteps.contains(3),
+                  isCurrentOrange: step == 3 && !completedSteps.contains(3),
                 ),
               ),
               SizedBox(width: 6.w),
               Expanded(
                 child: _buildProgressBar(
-                  isActiveOrDone: step >= 4 || completedSteps.contains(4),
-                  isCurrentOrange: step == 4 && activeType == SmartDocumentType.suratSehat,
+                  isActiveOrDone: completedSteps.contains(4),
+                  isCurrentOrange: step == 4 && !completedSteps.contains(4),
                 ),
               ),
             ],
@@ -143,7 +143,7 @@ class SmartDocumentStepperHeader extends StatelessWidget {
                   label: '1. KTP',
                   type: SmartDocumentType.ktp,
                   isCurrent: step == 1,
-                  isCompleted: completedSteps.contains(1) || step > 1,
+                  isCompleted: completedSteps.contains(1),
                 ),
               ),
               Expanded(
@@ -152,7 +152,7 @@ class SmartDocumentStepperHeader extends StatelessWidget {
                   label: '2. KK',
                   type: SmartDocumentType.kartuKeluarga,
                   isCurrent: step == 2,
-                  isCompleted: completedSteps.contains(2) || step > 2,
+                  isCompleted: completedSteps.contains(2),
                 ),
               ),
               Expanded(
@@ -161,7 +161,7 @@ class SmartDocumentStepperHeader extends StatelessWidget {
                   label: '3. SIM',
                   type: SmartDocumentType.sim,
                   isCurrent: step == 3,
-                  isCompleted: completedSteps.contains(3) || step > 3,
+                  isCompleted: completedSteps.contains(3),
                 ),
               ),
               Expanded(
@@ -182,12 +182,12 @@ class SmartDocumentStepperHeader extends StatelessWidget {
 
   Widget _buildProgressBar({required bool isActiveOrDone, bool isCurrentOrange = false}) {
     Color barColor;
-    if (isCurrentOrange && activeType == SmartDocumentType.suratSehat) {
-      barColor = const Color(0xFFFD990F); // Orange in Surat Sehat step
-    } else if (isActiveOrDone) {
-      barColor = const Color(0xFF0B3866); // Dark blue in completed/active
+    if (isActiveOrDone) {
+      barColor = const Color(0xFF0B3866); // Dark blue for successfully completed step
+    } else if (isCurrentOrange) {
+      barColor = const Color(0xFFFD990F); // Orange for currently ongoing/active step before capture success
     } else {
-      barColor = const Color(0xFFE2E8F0); // Subtle light grey for inactive
+      barColor = const Color(0xFFE2E8F0); // Light grey for upcoming pending step
     }
 
     return Container(
@@ -217,37 +217,25 @@ class SmartDocumentStepperHeader extends StatelessWidget {
       );
       textColor = const Color(0xFF0B3866);
     } else if (isCurrent) {
-      if (type == SmartDocumentType.suratSehat) {
-        indicator = Container(
-          width: 14.sp,
-          height: 14.sp,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Color(0xFFFD990F),
+      indicator = Container(
+        width: 14.sp,
+        height: 14.sp,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFFFD990F),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$stepNum',
+          style: TextStyle(
+            fontFamily: 'PlusJakartaSans',
+            color: Colors.white,
+            fontSize: 8.5.sp,
+            fontWeight: FontWeight.w700,
           ),
-          alignment: Alignment.center,
-          child: Text(
-            '4',
-            style: TextStyle(
-              fontFamily: 'PlusJakartaSans',
-              color: Colors.white,
-              fontSize: 8.5.sp,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        );
-        textColor = const Color(0xFF0B3866);
-      } else {
-        indicator = Container(
-          width: 7.sp,
-          height: 7.sp,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Color(0xFF0B3866),
-          ),
-        );
-        textColor = const Color(0xFF0B3866);
-      }
+        ),
+      );
+      textColor = const Color(0xFF0B3866);
     } else {
       indicator = Container(
         width: 6.sp,
