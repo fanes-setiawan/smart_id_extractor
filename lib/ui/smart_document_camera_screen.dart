@@ -13,7 +13,6 @@ import '../utils/document_cropper.dart';
 import '../utils/kk_extractor_helper.dart';
 import '../utils/sim_extractor_helper.dart';
 import '../utils/surat_sehat_extractor_helper.dart';
-import 'custom_snackbar.dart';
 
 /// Comprehensive multi-document camera verification screen.
 ///
