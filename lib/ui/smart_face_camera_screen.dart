@@ -82,6 +82,14 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
 
   late final FaceDetector _faceDetector;
 
+  bool get _isFrontCamera {
+    if (_availableCameras.isEmpty || _selectedCameraIndex >= _availableCameras.length) {
+      return true;
+    }
+    return _availableCameras[_selectedCameraIndex].lensDirection ==
+        CameraLensDirection.front;
+  }
+
   SmartFaceFrameStatus _frameStatus = SmartFaceFrameStatus.noFace;
   String _guideTitle = 'Posisikan wajah Anda di dalam lingkaran';
   String _guideSubtitle = 'Pastikan wajah terlihat jelas di dalam lingkaran.';
@@ -304,6 +312,12 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
         height: cropSize,
       );
 
+      // Jika menggunakan kamera depan, balik gambar secara horizontal (mirror)
+      // agar foto yang disimpan persis sama seperti cermin yang dilihat user di layar
+      if (_isFrontCamera) {
+        croppedImage = img.flipHorizontal(croppedImage);
+      }
+
       // 5. Standarisasi Output: 720 × 720 px, Aspect Ratio 1:1
       img.Image resizedImage = img.copyResize(
         croppedImage,
@@ -412,7 +426,13 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                         Center(
                           child: AspectRatio(
                             aspectRatio: 1 / _controller!.value.aspectRatio,
-                            child: CameraPreview(_controller!),
+                            child: _isFrontCamera
+                                ? Transform(
+                                    alignment: Alignment.center,
+                                    transform: Matrix4.rotationY(math.pi),
+                                    child: CameraPreview(_controller!),
+                                  )
+                                : CameraPreview(_controller!),
                           ),
                         ),
                       if (_capturedFile != null)
