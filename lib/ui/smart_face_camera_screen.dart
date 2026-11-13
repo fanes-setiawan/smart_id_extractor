@@ -486,25 +486,26 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
 
   Widget _buildFaceViewfinderCard() {
     final double cardWidth = 345.w;
-    final double cardHeight = cardWidth * 1.15; // Rasio tinggi ideal
+    // Saat review hasil (1:1), buat card tepat persegi (1:1) agar foto memenuhi container tanpa sisa padding
+    final double cardHeight = _capturedFile != null ? cardWidth : cardWidth * 1.15;
 
     return Center(
       child: Container(
         width: cardWidth,
         height: cardHeight,
         decoration: BoxDecoration(
-          color: const Color(0xFF111C2D),
-          borderRadius: BorderRadius.circular(22.r),
+          color: _capturedFile != null ? Colors.white : const Color(0xFF111C2D),
+          borderRadius: BorderRadius.circular(20.r),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF002245).withOpacity(0.12),
+              color: const Color(0xFF002245).withOpacity(0.08),
               blurRadius: 16.r,
-              offset: Offset(0, 6.h),
+              offset: Offset(0, 4.h),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(22.r),
+          borderRadius: BorderRadius.circular(20.r),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -527,14 +528,13 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                   ),
                 ),
 
-              // 2. Hasil Foto (Frame hilang total, bersih, flat square)
+              // 2. Hasil Foto (Memenuhi card 1:1 secara penuh, tajam, dan proporsional tanpa gap)
               if (_capturedFile != null)
-                Container(
-                  color: Colors.white,
-                  child: Image.file(
-                    _capturedFile!,
-                    fit: BoxFit.contain,
-                  ),
+                Image.file(
+                  _capturedFile!,
+                  fit: BoxFit.cover,
+                  width: cardWidth,
+                  height: cardHeight,
                 ),
 
               // 3. Circle Face Frame Overlay (Hanya saat memotret)
