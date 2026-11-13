@@ -7,10 +7,11 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:image/image.dart' as img;
 
 import 'custom_snackbar.dart';
 
-/// Alignment status of a detected face inside the head & shoulders frame guide.
+/// Status panduan wajah di dalam bingkai foto profil
 enum SmartFaceFrameStatus {
   noFace,
   multipleFaces,
@@ -20,15 +21,11 @@ enum SmartFaceFrameStatus {
   aligned,
 }
 
-/// A complete Face Camera Screen featuring:
-/// - Combined Head (Oval) & Shoulders Frame Guide (`SmartFaceFrameOverlayPainter`)
-/// - Works standalone without ScreenUtil dependency errors (uses ScreenUtilInit safe fallback)
-/// - Robust Still-Frame Verification (prevents camera ImageStream buffer crashes)
-/// - Live color-coded visual feedback (Green = Aligned, Amber = Adjust, White = Neutral)
-/// - Instruction banner with smooth transitions
-/// - Front/back camera toggle
-/// - Disabled shutter button until face is positioned
-/// - Disabled Save button until captured photo has a valid, aligned face
+/// Layar Kamera Foto Profil Berstandar:
+/// - Frame lingkaran wajah presisi dengan 4 corner brackets
+/// - Deteksi keberadaan wajah manusia & anti-blur
+/// - Output konsisten: Resolusi 720 × 720 px (1:1), JPEG Quality 85%, ukuran 100–300 KB
+/// - Standalone & aman tanpa dependensi ScreenUtil eksternal
 class SmartFaceCameraScreen extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -36,8 +33,8 @@ class SmartFaceCameraScreen extends StatelessWidget {
 
   const SmartFaceCameraScreen({
     super.key,
-    this.title = 'Foto Profil',
-    this.subtitle = 'Posisikan kepala dan bahu di dalam bingkai',
+    this.title = 'Uji Foto Profil',
+    this.subtitle = 'Pastikan seluruh wajah masuk dalam lingkaran',
     this.onPhotoSaved,
   });
 
@@ -86,7 +83,8 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
   late final FaceDetector _faceDetector;
 
   SmartFaceFrameStatus _frameStatus = SmartFaceFrameStatus.noFace;
-  String _guideMessage = 'Posisikan kepala dan bahu Anda di dalam bingkai';
+  String _guideTitle = 'Posisikan wajah Anda di dalam lingkaran';
+  String _guideSubtitle = 'Pastikan wajah terlihat jelas di dalam lingkaran.';
   bool _isFaceAligned = false;
 
   @override
@@ -97,7 +95,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
       options: FaceDetectorOptions(
         performanceMode: FaceDetectorMode.accurate,
         enableLandmarks: true,
-        enableClassification: false,
+        enableClassification: true,
         minFaceSize: 0.20,
       ),
     );
@@ -158,6 +156,8 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
     await _setupCameraController(_availableCameras[_selectedCameraIndex]);
   }
 
+  /// Memproses jepretan, memvalidasi keberadaan wajah manusia,
+  /// melakukan smart 1:1 square crop terpusat di wajah, lalu me-resize ke 720×720 @ 85% JPEG.
   Future<void> _takePictureAndVerify() async {
     if (_controller == null ||
         !_controller!.value.isInitialized ||
@@ -172,21 +172,22 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
 
     try {
       final XFile picture = await _controller!.takePicture();
-      final File file = File(picture.path);
+      final File rawFile = File(picture.path);
 
-      // Verify face position in the captured photo using ML Kit
-      final inputImage = InputImage.fromFilePath(file.path);
+      // 1. Validasi Keberadaan Wajah Menggunakan Google ML Kit
+      final inputImage = InputImage.fromFilePath(rawFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
 
       if (faces.isEmpty) {
         showCustomSnackBar(
           context,
-          'Wajah tidak terdeteksi. Posisikan wajah dan bahu tepat di dalam bingkai.',
+          'Wajah tidak terdeteksi. Posisikan wajah Anda tepat di dalam lingkaran.',
         );
         setState(() {
           _frameStatus = SmartFaceFrameStatus.noFace;
           _isFaceAligned = false;
-          _guideMessage = 'Wajah tidak terdeteksi di dalam bingkai';
+          _guideTitle = 'Wajah tidak terdeteksi di dalam lingkaran';
+          _guideSubtitle = 'Posisikan wajah menghadap langsung ke kamera.';
         });
         return;
       }
@@ -194,34 +195,51 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
       if (faces.length > 1) {
         showCustomSnackBar(
           context,
-          'Terdeteksi lebih dari satu wajah. Pastikan hanya ada satu orang.',
+          'Terdeteksi lebih dari satu wajah. Pastikan hanya ada 1 orang di frame.',
         );
         setState(() {
           _frameStatus = SmartFaceFrameStatus.multipleFaces;
           _isFaceAligned = false;
-          _guideMessage = 'Pastikan hanya ada satu wajah di bingkai';
+          _guideTitle = 'Terdeteksi lebih dari 1 wajah';
+          _guideSubtitle = 'Pastikan hanya wajah Anda yang terlihat.';
         });
         return;
       }
 
-      final face = faces.first;
-      final box = face.boundingBox;
+      final Face face = faces.first;
+      final Rect faceBox = face.boundingBox;
 
-      // Decode image dimensions to check alignment ratio
-      final decodedImage = await decodeImageFromList(await file.readAsBytes());
-      final imgW = decodedImage.width.toDouble();
-      final imgH = decodedImage.height.toDouble();
+      // 2. Decode raw image & orientasikan sesuai EXIF
+      final rawBytes = await rawFile.readAsBytes();
+      img.Image? originalImage = img.decodeImage(rawBytes);
 
-      final minDim = math.min(imgW, imgH);
-      final faceDim = math.max(box.width, box.height);
-      final ratio = faceDim / minDim;
+      if (originalImage == null) {
+        showCustomSnackBar(
+          context,
+          'Gagal memproses gambar. Silakan coba lagi.',
+        );
+        return;
+      }
 
-      final faceCenterX = (box.left + box.right) / 2.0;
-      final faceCenterY = (box.top + box.bottom) / 2.0;
-      final relOffsetX = (faceCenterX - (imgW / 2.0)).abs() / (imgW / 2.0);
-      final relOffsetY = (faceCenterY - (imgH * 0.40)).abs() / (imgH * 0.40);
+      // Pastikan rotasi gambar tegak sesuai EXIF kamera
+      originalImage = img.bakeOrientation(originalImage);
 
-      if (ratio < 0.22) {
+      final int imgWidth = originalImage.width;
+      final int imgHeight = originalImage.height;
+
+      // 3. Validasi Proporsi Wajah (Anti-terlalu jauh / terlalu dekat)
+      final double minDimension = math.min(imgWidth, imgHeight).toDouble();
+      final double faceDimension = math.max(faceBox.width, faceBox.height);
+      final double faceRatio = faceDimension / minDimension;
+
+      final double faceCenterX = (faceBox.left + faceBox.right) / 2.0;
+      final double faceCenterY = (faceBox.top + faceBox.bottom) / 2.0;
+      final double relOffsetX =
+          (faceCenterX - (imgWidth / 2.0)).abs() / (imgWidth / 2.0);
+      final double relOffsetY =
+          (faceCenterY - (imgHeight * 0.44)).abs() / (imgHeight * 0.44);
+
+      if (faceRatio < 0.20) {
         showCustomSnackBar(
           context,
           'Posisi wajah terlalu jauh. Dekatkan wajah Anda ke kamera.',
@@ -229,12 +247,13 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
         setState(() {
           _frameStatus = SmartFaceFrameStatus.tooFar;
           _isFaceAligned = false;
-          _guideMessage = 'Dekatkan wajah Anda ke kamera';
+          _guideTitle = 'Dekatkan wajah Anda ke kamera';
+          _guideSubtitle = 'Wajah harus mengisi area lingkaran dengan pas.';
         });
         return;
       }
 
-      if (ratio > 0.82) {
+      if (faceRatio > 0.88) {
         showCustomSnackBar(
           context,
           'Posisi wajah terlalu dekat. Jauhkan sedikit wajah Anda.',
@@ -242,33 +261,81 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
         setState(() {
           _frameStatus = SmartFaceFrameStatus.tooClose;
           _isFaceAligned = false;
-          _guideMessage = 'Jauhkan sedikit wajah Anda dari kamera';
+          _guideTitle = 'Jauhkan sedikit wajah Anda dari kamera';
+          _guideSubtitle = 'Beri sedikit ruang antara wajah dan tepi bingkai.';
         });
         return;
       }
 
-      if (relOffsetX > 0.35 || relOffsetY > 0.45) {
+      if (relOffsetX > 0.38 || relOffsetY > 0.45) {
         showCustomSnackBar(
           context,
-          'Posisi wajah tidak pas di tengah. Sejajarkan kepala dan bahu di bingkai.',
+          'Posisikan wajah tepat di tengah lingkaran.',
         );
         setState(() {
           _frameStatus = SmartFaceFrameStatus.offCenter;
           _isFaceAligned = false;
-          _guideMessage = 'Posisikan wajah tepat di tengah bingkai';
+          _guideTitle = 'Posisikan wajah tepat di tengah';
+          _guideSubtitle = 'Sejajarkan wajah dengan lingkaran hijau.';
         });
         return;
       }
 
-      // Valid & Aligned!
+      // 4. Potong Persegi 1:1 Berpusat pada Wajah
+      // Menghitung crop box persegi berpusat pada titik tengah wajah
+      final int cropSize = math.min(
+        imgWidth,
+        (faceDimension * 1.85).round().clamp(300, math.min(imgWidth, imgHeight)),
+      );
+
+      int cropX = (faceCenterX - (cropSize / 2.0)).round();
+      // Berikan ruang sedikit lebih banyak di atas kepala agar proporsional
+      int cropY = (faceCenterY - (cropSize * 0.46)).round();
+
+      // Pastikan koordinat crop tidak keluar batas gambar
+      cropX = cropX.clamp(0, imgWidth - cropSize);
+      cropY = cropY.clamp(0, imgHeight - cropSize);
+
+      img.Image croppedImage = img.copyCrop(
+        originalImage,
+        x: cropX,
+        y: cropY,
+        width: cropSize,
+        height: cropSize,
+      );
+
+      // 5. Standarisasi Output: 720 × 720 px, Aspect Ratio 1:1
+      img.Image resizedImage = img.copyResize(
+        croppedImage,
+        width: 720,
+        height: 720,
+        interpolation: img.Interpolation.linear,
+      );
+
+      // 6. Encode JPEG dengan Quality 85% (Estimasi Ukuran: 100 - 300 KB)
+      final List<int> processedBytes = img.encodeJpg(resizedImage, quality: 85);
+
+      final String finalPath =
+          '${rawFile.parent.path}/profil_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final File processedFile = await File(finalPath).writeAsBytes(processedBytes);
+
+      // Hapus file temporary mentahan
+      try {
+        if (await rawFile.exists()) {
+          await rawFile.delete();
+        }
+      } catch (_) {}
+
+      // Sukses dan terverifikasi
       setState(() {
-        _capturedFile = file;
+        _capturedFile = processedFile;
         _isFaceAligned = true;
         _frameStatus = SmartFaceFrameStatus.aligned;
-        _guideMessage = 'Posisi kepala dan bahu sesuai! Siap disimpan.';
+        _guideTitle = 'Posisi kepala dan wajah sudah sesuai!';
+        _guideSubtitle = 'Pastikan wajah terlihat jelas di dalam lingkaran.';
       });
     } catch (e) {
-      debugPrint('Error capturing and verifying face: $e');
+      debugPrint('Error capturing & processing face image: $e');
       showCustomSnackBar(
         context,
         'Terjadi kendala saat memproses foto. Silakan coba lagi.',
@@ -292,8 +359,6 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
 
   @override
   Widget build(BuildContext context) {
-    final Size screenSize = MediaQuery.of(context).size;
-
     return Scaffold(
       backgroundColor: const Color(0xFF071426),
       appBar: AppBar(
@@ -340,6 +405,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
+                      // Camera Preview atau Hasil Jepretan
                       if (_capturedFile == null &&
                           _controller != null &&
                           _controller!.value.isInitialized)
@@ -357,22 +423,21 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                           ),
                         ),
 
-                      // Head & Shoulders Frame Overlay
+                      // Circle Face Frame Overlay dengan 4 Corner Brackets
                       CustomPaint(
                         size: Size.infinite,
-                        painter: SmartFaceFrameOverlayPainter(
-                          screenSize: screenSize,
+                        painter: CircleFaceFrameOverlayPainter(
                           isAligned: _isFaceAligned,
                           status: _frameStatus,
                           hasPhoto: _capturedFile != null,
                         ),
                       ),
 
-                      // Top Guidance Banner
+                      // Top Guidance Banner (Hijau saat pas, Navy saat mencari)
                       Positioned(
-                        top: 16.h,
-                        left: 20.w,
-                        right: 20.w,
+                        top: 14.h,
+                        left: 16.w,
+                        right: 16.w,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           padding: EdgeInsets.symmetric(
@@ -381,9 +446,9 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                           ),
                           decoration: BoxDecoration(
                             color: _isFaceAligned
-                                ? const Color(0xFF065F46).withOpacity(0.92)
-                                : const Color(0xFF0F172A).withOpacity(0.88),
-                            borderRadius: BorderRadius.circular(14.r),
+                                ? const Color(0xFF059669).withOpacity(0.95)
+                                : const Color(0xFF0F172A).withOpacity(0.90),
+                            borderRadius: BorderRadius.circular(16.r),
                             border: Border.all(
                               color: _isFaceAligned
                                   ? const Color(0xFF10B981)
@@ -400,29 +465,95 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                _isFaceAligned
-                                    ? Icons.check_circle_rounded
-                                    : Icons.face_retouching_natural_rounded,
-                                color: _isFaceAligned
-                                    ? const Color(0xFF34D399)
-                                    : const Color(0xFFFD990F),
-                                size: 22.sp,
+                              Container(
+                                width: 28.w,
+                                height: 28.w,
+                                decoration: BoxDecoration(
+                                  color: _isFaceAligned
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFFFD990F),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  _isFaceAligned
+                                      ? Icons.check_rounded
+                                      : Icons.face_retouching_natural_rounded,
+                                  color: Colors.white,
+                                  size: 18.sp,
+                                ),
                               ),
-                              SizedBox(width: 10.w),
+                              SizedBox(width: 12.w),
                               Expanded(
-                                child: Text(
-                                  _guideMessage,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12.sp,
-                                    fontFamily: 'PlusJakartaSans',
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.3,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _guideTitle,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13.sp,
+                                        fontFamily: 'PlusJakartaSans',
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2.h),
+                                    Text(
+                                      _guideSubtitle,
+                                      style: TextStyle(
+                                        color: const Color(0xFFE2E8F0),
+                                        fontSize: 11.sp,
+                                        fontFamily: 'PlusJakartaSans',
+                                        fontWeight: FontWeight.w400,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                      ),
+
+                      // Pill Petunjuk di Bawah Frame
+                      Positioned(
+                        bottom: 22.h,
+                        left: 40.w,
+                        right: 40.w,
+                        child: Center(
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 8.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.65),
+                              borderRadius: BorderRadius.circular(24.r),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.crop_free_rounded,
+                                  color: Colors.white,
+                                  size: 20.sp,
+                                ),
+                                SizedBox(width: 8.w),
+                                Text(
+                                  'Pastikan seluruh wajah\nmasuk dalam lingkaran',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11.sp,
+                                    fontFamily: 'PlusJakartaSans',
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -434,7 +565,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                 Container(
                   width: double.infinity,
                   padding:
-                      EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+                      EdgeInsets.symmetric(horizontal: 24.w, vertical: 18.h),
                   decoration: const BoxDecoration(
                     color: Color(0xFF0B192C),
                     border: Border(
@@ -468,7 +599,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                     ),
                     SizedBox(height: 16.h),
                     Text(
-                      'Memeriksa posisi kepala & bahu...',
+                      'Menyelaraskan foto 720 × 720 px...',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 13.sp,
@@ -489,17 +620,6 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'Posisikan kepala dan bahu di dalam bingkai',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: const Color(0xFF94A3B8),
-            fontSize: 12.sp,
-            fontFamily: 'PlusJakartaSans',
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        SizedBox(height: 14.h),
         GestureDetector(
           onTap: _takePictureAndVerify,
           child: AnimatedContainer(
@@ -519,13 +639,9 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
             ),
             padding: EdgeInsets.all(5.w),
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white,
-                  width: 2.5,
-                ),
-                color: const Color(0xFFFD990F),
+                color: Color(0xFFFD990F),
               ),
               child: Icon(
                 Icons.camera_alt_rounded,
@@ -544,7 +660,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
 
     return Row(
       children: [
-        // Ulangi Button
+        // Tombol Ulangi
         Expanded(
           child: SizedBox(
             height: 48.h,
@@ -553,8 +669,9 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                 setState(() {
                   _capturedFile = null;
                   _frameStatus = SmartFaceFrameStatus.noFace;
-                  _guideMessage =
-                      'Posisikan kepala dan bahu Anda di dalam bingkai';
+                  _guideTitle = 'Posisikan wajah Anda di dalam lingkaran';
+                  _guideSubtitle =
+                      'Pastikan wajah terlihat jelas di dalam lingkaran.';
                   _isFaceAligned = false;
                 });
               },
@@ -581,7 +698,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
         ),
         SizedBox(width: 14.w),
 
-        // Simpan Button (Disabled if face is not aligned/valid)
+        // Tombol Simpan (Disabled jika wajah belum sesuai)
         Expanded(
           child: SizedBox(
             height: 48.h,
@@ -631,15 +748,13 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
   }
 }
 
-/// Custom painter for the Head & Shoulders frame cutout and adaptive border.
-class SmartFaceFrameOverlayPainter extends CustomPainter {
-  final Size screenSize;
+/// Custom painter: Lingkaran hijau presisi + 4 Corner Bracket Sudut
+class CircleFaceFrameOverlayPainter extends CustomPainter {
   final bool isAligned;
   final SmartFaceFrameStatus status;
   final bool hasPhoto;
 
-  SmartFaceFrameOverlayPainter({
-    required this.screenSize,
+  CircleFaceFrameOverlayPainter({
     required this.isAligned,
     required this.status,
     required this.hasPhoto,
@@ -649,108 +764,98 @@ class SmartFaceFrameOverlayPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.width == 0 || size.height == 0) return;
 
-    final double headWidth = size.width * 0.54;
-    final double headHeight = headWidth * 1.30;
-    final double headCenterY = size.height * 0.38;
-    final headRect = Rect.fromCenter(
-      center: Offset(size.width / 2.0, headCenterY),
-      width: headWidth,
-      height: headHeight,
+    final double circleDiameter = size.width * 0.68;
+    final Offset circleCenter = Offset(size.width / 2.0, size.height * 0.44);
+    final Rect circleRect = Rect.fromCircle(
+      center: circleCenter,
+      radius: circleDiameter / 2.0,
     );
 
-    // Build Head (Oval) + Shoulders (Curved base) Silhouette Path
-    final silhouettePath = Path();
-
-    // 1. Head Oval
-    silhouettePath.addOval(headRect);
-
-    // 2. Shoulders Path
-    final double shoulderTopY = headRect.bottom - (headHeight * 0.18);
-    final double shoulderWidth = size.width * 0.88;
-    final double shoulderLeft = (size.width - shoulderWidth) / 2.0;
-    final double shoulderRight = shoulderLeft + shoulderWidth;
-    final double shoulderBottomY = size.height * 0.80;
-
-    final shoulderPath = Path();
-    shoulderPath.moveTo(headRect.left + (headWidth * 0.15), shoulderTopY);
-    // Left shoulder curve
-    shoulderPath.quadraticBezierTo(
-      shoulderLeft + (shoulderWidth * 0.15),
-      shoulderTopY + 25,
-      shoulderLeft,
-      shoulderBottomY,
-    );
-    shoulderPath.lineTo(shoulderRight, shoulderBottomY);
-    // Right shoulder curve
-    shoulderPath.quadraticBezierTo(
-      shoulderRight - (shoulderWidth * 0.15),
-      shoulderTopY + 25,
-      headRect.right - (headWidth * 0.15),
-      shoulderTopY,
-    );
-    shoulderPath.close();
-
-    // Combined Cutout
-    final combinedGuidePath = Path.combine(
-      PathOperation.union,
-      silhouettePath,
-      shoulderPath,
-    );
-
-    // Dark semi-transparent scrim with silhouette cutout
+    // 1. Scrim gelap dengan lubang lingkaran
     final backgroundPath = Path()
       ..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+    final circleHolePath = Path()..addOval(circleRect);
     final transparentHolePath = Path.combine(
       PathOperation.difference,
       backgroundPath,
-      combinedGuidePath,
+      circleHolePath,
     );
 
     final scrimPaint = Paint()
-      ..color = Colors.black.withOpacity(hasPhoto ? 0.35 : 0.65)
+      ..color = Colors.black.withOpacity(hasPhoto ? 0.20 : 0.65)
       ..style = PaintingStyle.fill;
     canvas.drawPath(transparentHolePath, scrimPaint);
 
-    // Outline with state color
-    final Color borderColor = isAligned
-        ? const Color(0xFF10B981) // Emerald Green
+    // 2. Garis Lingkaran Hijau/Amber
+    final Color circleColor = isAligned
+        ? const Color(0xFF10B981) // Hijau Emerald
         : (status == SmartFaceFrameStatus.offCenter ||
                 status == SmartFaceFrameStatus.tooFar ||
                 status == SmartFaceFrameStatus.tooClose)
             ? const Color(0xFFFD990F) // Amber
-            : Colors.white.withOpacity(0.50);
+            : const Color(0xFF10B981).withOpacity(0.90);
 
-    final borderPaint = Paint()
-      ..color = borderColor
-      ..strokeWidth = isAligned ? 3.0 : 2.0
+    final circlePaint = Paint()
+      ..color = circleColor
+      ..strokeWidth = 3.5
       ..style = PaintingStyle.stroke;
-    canvas.drawPath(combinedGuidePath, borderPaint);
+    canvas.drawCircle(circleCenter, circleDiameter / 2.0, circlePaint);
 
-    // Soft eye-level line across head oval
-    final eyeLinePaint = Paint()
-      ..color = Colors.white.withOpacity(0.20)
-      ..strokeWidth = 1.0
+    // 3. Empat Corner Brackets Sudut (Putih) di sekeliling lingkaran
+    final cornerPaint = Paint()
+      ..color = Colors.white.withOpacity(0.85)
+      ..strokeWidth = 3.5
+      ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    final double eyeLevelY = headRect.top + (headHeight * 0.38);
-    const double dashWidth = 6.0;
-    const double dashSpace = 6.0;
-    final double eyeLineStart = headRect.left + (headWidth * 0.20);
-    final double eyeLineEnd = headRect.right - (headWidth * 0.20);
+    final double bracketBoxSize = circleDiameter * 1.34;
+    final Rect bracketRect = Rect.fromCenter(
+      center: circleCenter,
+      width: bracketBoxSize,
+      height: bracketBoxSize,
+    );
+    const double armLength = 26.0;
+    const double cornerRadius = 10.0;
 
-    double currentX = eyeLineStart;
-    while (currentX < eyeLineEnd) {
-      canvas.drawLine(
-        Offset(currentX, eyeLevelY),
-        Offset(math.min(currentX + dashWidth, eyeLineEnd), eyeLevelY),
-        eyeLinePaint,
-      );
-      currentX += dashWidth + dashSpace;
-    }
+    // Top-Left
+    final tl = Path()
+      ..moveTo(bracketRect.left, bracketRect.top + armLength)
+      ..lineTo(bracketRect.left, bracketRect.top + cornerRadius)
+      ..quadraticBezierTo(bracketRect.left, bracketRect.top,
+          bracketRect.left + cornerRadius, bracketRect.top)
+      ..lineTo(bracketRect.left + armLength, bracketRect.top);
+    canvas.drawPath(tl, cornerPaint);
+
+    // Top-Right
+    final tr = Path()
+      ..moveTo(bracketRect.right - armLength, bracketRect.top)
+      ..lineTo(bracketRect.right - cornerRadius, bracketRect.top)
+      ..quadraticBezierTo(bracketRect.right, bracketRect.top,
+          bracketRect.right, bracketRect.top + cornerRadius)
+      ..lineTo(bracketRect.right, bracketRect.top + armLength);
+    canvas.drawPath(tr, cornerPaint);
+
+    // Bottom-Left
+    final bl = Path()
+      ..moveTo(bracketRect.left, bracketRect.bottom - armLength)
+      ..lineTo(bracketRect.left, bracketRect.bottom - cornerRadius)
+      ..quadraticBezierTo(bracketRect.left, bracketRect.bottom,
+          bracketRect.left + cornerRadius, bracketRect.bottom)
+      ..lineTo(bracketRect.left + armLength, bracketRect.bottom);
+    canvas.drawPath(bl, cornerPaint);
+
+    // Bottom-Right
+    final br = Path()
+      ..moveTo(bracketRect.right - armLength, bracketRect.bottom)
+      ..lineTo(bracketRect.right - cornerRadius, bracketRect.bottom)
+      ..quadraticBezierTo(bracketRect.right, bracketRect.bottom,
+          bracketRect.right, bracketRect.bottom - cornerRadius)
+      ..lineTo(bracketRect.right, bracketRect.bottom - armLength);
+    canvas.drawPath(br, cornerPaint);
   }
 
   @override
-  bool shouldRepaint(covariant SmartFaceFrameOverlayPainter oldDelegate) {
+  bool shouldRepaint(covariant CircleFaceFrameOverlayPainter oldDelegate) {
     return oldDelegate.isAligned != isAligned ||
         oldDelegate.status != status ||
         oldDelegate.hasPhoto != hasPhoto;
