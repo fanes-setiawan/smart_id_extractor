@@ -22,10 +22,11 @@ enum SmartFaceFrameStatus {
 }
 
 /// Layar Kamera Foto Profil Berstandar:
-/// - Frame lingkaran wajah presisi dengan 4 corner brackets
-/// - Deteksi keberadaan wajah manusia & anti-blur
+/// - Background putih bersih tanpa shadow & tanpa garis tepi yang berlebihan
+/// - AppBar konsisten (Background putih, teks judul Dark Navy #0B3866, back chevron #111C2D)
+/// - Saat pemotretan: Menampilkan frame lingkaran hijau + 4 corner brackets
+/// - Saat foto berhasil diambil: Frame, banner panduan, dan pill overlay otomatis HILANG
 /// - Output konsisten: Resolusi 720 × 720 px (1:1), JPEG Quality 85%, ukuran 100–300 KB
-/// - Standalone & aman tanpa dependensi ScreenUtil eksternal
 class SmartFaceCameraScreen extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -83,7 +84,8 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
   late final FaceDetector _faceDetector;
 
   bool get _isFrontCamera {
-    if (_availableCameras.isEmpty || _selectedCameraIndex >= _availableCameras.length) {
+    if (_availableCameras.isEmpty ||
+        _selectedCameraIndex >= _availableCameras.length) {
       return true;
     }
     return _availableCameras[_selectedCameraIndex].lensDirection ==
@@ -164,8 +166,6 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
     await _setupCameraController(_availableCameras[_selectedCameraIndex]);
   }
 
-  /// Memproses jepretan, memvalidasi keberadaan wajah manusia,
-  /// melakukan smart 1:1 square crop terpusat di wajah, lalu me-resize ke 720×720 @ 85% JPEG.
   Future<void> _takePictureAndVerify() async {
     if (_controller == null ||
         !_controller!.value.isInitialized ||
@@ -182,7 +182,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
       final XFile picture = await _controller!.takePicture();
       final File rawFile = File(picture.path);
 
-      // 1. Validasi Keberadaan Wajah Menggunakan Google ML Kit
+      // 1. Validasi Keberadaan Wajah
       final inputImage = InputImage.fromFilePath(rawFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
 
@@ -217,7 +217,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
       final Face face = faces.first;
       final Rect faceBox = face.boundingBox;
 
-      // 2. Decode raw image & orientasikan sesuai EXIF
+      // 2. Decode & Orientasi EXIF
       final rawBytes = await rawFile.readAsBytes();
       img.Image? originalImage = img.decodeImage(rawBytes);
 
@@ -229,13 +229,12 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
         return;
       }
 
-      // Pastikan rotasi gambar tegak sesuai EXIF kamera
       originalImage = img.bakeOrientation(originalImage);
 
       final int imgWidth = originalImage.width;
       final int imgHeight = originalImage.height;
 
-      // 3. Validasi Proporsi Wajah (Anti-terlalu jauh / terlalu dekat)
+      // 3. Validasi Proporsi Wajah
       final double minDimension = math.min(imgWidth, imgHeight).toDouble();
       final double faceDimension = math.max(faceBox.width, faceBox.height);
       final double faceRatio = faceDimension / minDimension;
@@ -290,17 +289,14 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
       }
 
       // 4. Potong Persegi 1:1 Berpusat pada Wajah
-      // Menghitung crop box persegi berpusat pada titik tengah wajah
       final int cropSize = math.min(
         imgWidth,
         (faceDimension * 1.85).round().clamp(300, math.min(imgWidth, imgHeight)),
       );
 
       int cropX = (faceCenterX - (cropSize / 2.0)).round();
-      // Berikan ruang sedikit lebih banyak di atas kepala agar proporsional
       int cropY = (faceCenterY - (cropSize * 0.46)).round();
 
-      // Pastikan koordinat crop tidak keluar batas gambar
       cropX = cropX.clamp(0, imgWidth - cropSize);
       cropY = cropY.clamp(0, imgHeight - cropSize);
 
@@ -312,13 +308,12 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
         height: cropSize,
       );
 
-      // Jika menggunakan kamera depan, balik gambar secara horizontal (mirror)
-      // agar foto yang disimpan persis sama seperti cermin yang dilihat user di layar
+      // Balik gambar horizontal jika menggunakan kamera depan agar seperti cermin
       if (_isFrontCamera) {
         croppedImage = img.flipHorizontal(croppedImage);
       }
 
-      // 5. Standarisasi Output: 720 × 720 px, Aspect Ratio 1:1
+      // 5. Standarisasi Output: 720 × 720 px
       img.Image resizedImage = img.copyResize(
         croppedImage,
         width: 720,
@@ -326,30 +321,27 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
         interpolation: img.Interpolation.linear,
       );
 
-      // 6. Encode JPEG dengan Quality 85% (Estimasi Ukuran: 100 - 300 KB)
+      // 6. Encode JPEG Quality 85% (100–300 KB)
       final List<int> processedBytes = img.encodeJpg(resizedImage, quality: 85);
 
       final String finalPath =
           '${rawFile.parent.path}/profil_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final File processedFile = await File(finalPath).writeAsBytes(processedBytes);
+      final File processedFile =
+          await File(finalPath).writeAsBytes(processedBytes);
 
-      // Hapus file temporary mentahan
       try {
         if (await rawFile.exists()) {
           await rawFile.delete();
         }
       } catch (_) {}
 
-      // Sukses dan terverifikasi
       setState(() {
         _capturedFile = processedFile;
         _isFaceAligned = true;
         _frameStatus = SmartFaceFrameStatus.aligned;
-        _guideTitle = 'Posisi kepala dan wajah sudah sesuai!';
-        _guideSubtitle = 'Pastikan wajah terlihat jelas di dalam lingkaran.';
       });
     } catch (e) {
-      debugPrint('Error capturing & processing face image: $e');
+      debugPrint('Error capturing face image: $e');
       showCustomSnackBar(
         context,
         'Terjadi kendala saat memproses foto. Silakan coba lagi.',
@@ -374,20 +366,25 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF071426),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF071426),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Colors.white),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: const Color(0xFF111C2D),
+            size: 20.sp,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           widget.title,
           style: TextStyle(
-            color: Colors.white,
-            fontSize: 18.sp,
+            color: const Color(0xFF0B3866),
+            fontSize: 17.sp,
             fontFamily: 'PlusJakartaSans',
             fontWeight: FontWeight.w700,
           ),
@@ -396,8 +393,11 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
         actions: [
           if (_capturedFile == null && _availableCameras.length > 1)
             IconButton(
-              icon: const Icon(Icons.flip_camera_ios_rounded,
-                  color: Colors.white),
+              icon: Icon(
+                Icons.flip_camera_ios_rounded,
+                color: const Color(0xFF0B3866),
+                size: 22.sp,
+              ),
               onPressed: _switchCamera,
               tooltip: 'Ganti Kamera',
             ),
@@ -419,7 +419,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      // Camera Preview atau Hasil Jepretan
+                      // 1. Live Camera Preview (Saat Belum Ada Foto)
                       if (_capturedFile == null &&
                           _controller != null &&
                           _controller!.value.isInitialized)
@@ -435,166 +435,162 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                                 : CameraPreview(_controller!),
                           ),
                         ),
+
+                      // 2. Tampilan Hasil Foto (Bersih, Rapi, Frame Hilang)
                       if (_capturedFile != null)
-                        Center(
-                          child: Image.file(
-                            _capturedFile!,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-
-                      // Circle Face Frame Overlay dengan 4 Corner Brackets
-                      CustomPaint(
-                        size: Size.infinite,
-                        painter: CircleFaceFrameOverlayPainter(
-                          isAligned: _isFaceAligned,
-                          status: _frameStatus,
-                          hasPhoto: _capturedFile != null,
-                        ),
-                      ),
-
-                      // Top Guidance Banner (Hijau saat pas, Navy saat mencari)
-                      Positioned(
-                        top: 14.h,
-                        left: 16.w,
-                        right: 16.w,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 14.w,
-                            vertical: 10.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _isFaceAligned
-                                ? const Color(0xFF059669).withOpacity(0.95)
-                                : const Color(0xFF0F172A).withOpacity(0.90),
-                            borderRadius: BorderRadius.circular(16.r),
-                            border: Border.all(
-                              color: _isFaceAligned
-                                  ? const Color(0xFF10B981)
-                                  : const Color(0xFFFD990F).withOpacity(0.85),
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 28.w,
-                                height: 28.w,
-                                decoration: BoxDecoration(
-                                  color: _isFaceAligned
-                                      ? const Color(0xFF10B981)
-                                      : const Color(0xFFFD990F),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  _isFaceAligned
-                                      ? Icons.check_rounded
-                                      : Icons.face_retouching_natural_rounded,
-                                  color: Colors.white,
-                                  size: 18.sp,
-                                ),
-                              ),
-                              SizedBox(width: 12.w),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      _guideTitle,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13.sp,
-                                        fontFamily: 'PlusJakartaSans',
-                                        fontWeight: FontWeight.w700,
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                    SizedBox(height: 2.h),
-                                    Text(
-                                      _guideSubtitle,
-                                      style: TextStyle(
-                                        color: const Color(0xFFE2E8F0),
-                                        fontSize: 11.sp,
-                                        fontFamily: 'PlusJakartaSans',
-                                        fontWeight: FontWeight.w400,
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Pill Petunjuk di Bawah Frame
-                      Positioned(
-                        bottom: 22.h,
-                        left: 40.w,
-                        right: 40.w,
-                        child: Center(
+                        Container(
+                          color: Colors.white,
+                          alignment: Alignment.center,
                           child: Container(
+                            width: 280.w,
+                            height: 280.w,
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(20.r),
+                            ),
+                            child: Image.file(
+                              _capturedFile!,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+
+                      // 3. Circle Face Frame Overlay (HANYA tampil saat memotret, HILANG setelah foto berhasil diambil)
+                      if (_capturedFile == null)
+                        CustomPaint(
+                          size: Size.infinite,
+                          painter: CircleFaceFrameOverlayPainter(
+                            isAligned: _isFaceAligned,
+                            status: _frameStatus,
+                            hasPhoto: false,
+                          ),
+                        ),
+
+                      // 4. Top Guidance Banner (HANYA tampil saat memotret)
+                      if (_capturedFile == null)
+                        Positioned(
+                          top: 14.h,
+                          left: 16.w,
+                          right: 16.w,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
                             padding: EdgeInsets.symmetric(
-                              horizontal: 16.w,
-                              vertical: 8.h,
+                              horizontal: 14.w,
+                              vertical: 10.h,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.65),
-                              borderRadius: BorderRadius.circular(24.r),
+                              color: _isFaceAligned
+                                  ? const Color(0xFF059669).withOpacity(0.95)
+                                  : const Color(0xFF0F172A).withOpacity(0.90),
+                              borderRadius: BorderRadius.circular(16.r),
                             ),
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.crop_free_rounded,
-                                  color: Colors.white,
-                                  size: 20.sp,
-                                ),
-                                SizedBox(width: 8.w),
-                                Text(
-                                  'Pastikan seluruh wajah\nmasuk dalam lingkaran',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
+                                Container(
+                                  width: 28.w,
+                                  height: 28.w,
+                                  decoration: BoxDecoration(
+                                    color: _isFaceAligned
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFFFD990F),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    _isFaceAligned
+                                        ? Icons.check_rounded
+                                        : Icons.face_retouching_natural_rounded,
                                     color: Colors.white,
-                                    fontSize: 11.sp,
-                                    fontFamily: 'PlusJakartaSans',
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.2,
+                                    size: 18.sp,
+                                  ),
+                                ),
+                                SizedBox(width: 12.w),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _guideTitle,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13.sp,
+                                          fontFamily: 'PlusJakartaSans',
+                                          fontWeight: FontWeight.w700,
+                                          height: 1.2,
+                                        ),
+                                      ),
+                                      SizedBox(height: 2.h),
+                                      Text(
+                                        _guideSubtitle,
+                                        style: TextStyle(
+                                          color: const Color(0xFFE2E8F0),
+                                          fontSize: 11.sp,
+                                          fontFamily: 'PlusJakartaSans',
+                                          fontWeight: FontWeight.w400,
+                                          height: 1.2,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                      ),
+
+                      // 5. Pill Petunjuk Bawah (HANYA tampil saat memotret)
+                      if (_capturedFile == null)
+                        Positioned(
+                          bottom: 22.h,
+                          left: 40.w,
+                          right: 40.w,
+                          child: Center(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 16.w,
+                                vertical: 8.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.65),
+                                borderRadius: BorderRadius.circular(24.r),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.crop_free_rounded,
+                                    color: Colors.white,
+                                    size: 20.sp,
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  Text(
+                                    'Pastikan seluruh wajah\nmasuk dalam lingkaran',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11.sp,
+                                      fontFamily: 'PlusJakartaSans',
+                                      fontWeight: FontWeight.w500,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
 
-                // Bottom Control Bar
+                // 6. Bottom Control Bar (Bersih, Background Putih)
                 Container(
                   width: double.infinity,
+                  color: Colors.white,
                   padding:
-                      EdgeInsets.symmetric(horizontal: 24.w, vertical: 18.h),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0B192C),
-                    border: Border(
-                      top: BorderSide(
-                        color: Color(0xFF1E293B),
-                        width: 1,
-                      ),
-                    ),
-                  ),
+                      EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
                   child: SafeArea(
                     top: false,
                     child: _capturedFile == null
@@ -609,7 +605,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
             Container(
               width: double.infinity,
               height: double.infinity,
-              color: Colors.black.withOpacity(0.60),
+              color: Colors.black.withOpacity(0.40),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -642,20 +638,12 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
       children: [
         GestureDetector(
           onTap: _takePictureAndVerify,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
+          child: Container(
             height: 72.w,
             width: 72.w,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFFFD990F),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFD990F).withOpacity(0.40),
-                  blurRadius: 18,
-                  spreadRadius: 2,
-                ),
-              ],
+              color: Color(0xFFFD990F),
             ),
             padding: EdgeInsets.all(5.w),
             child: Container(
@@ -676,8 +664,6 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
   }
 
   Widget _buildReviewControls() {
-    final bool canSave = _isFaceAligned;
-
     return Row(
       children: [
         // Tombol Ulangi
@@ -696,19 +682,18 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                 });
               },
               icon: Icon(Icons.refresh_rounded,
-                  size: 20.sp, color: Colors.white),
+                  size: 20.sp, color: const Color(0xFF0B3866)),
               label: Text(
                 'Ulangi',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: const Color(0xFF0B3866),
                   fontFamily: 'PlusJakartaSans',
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   fontSize: 14.sp,
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                side:
-                    const BorderSide(color: Color(0xFF334155), width: 1.2),
+                side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14.r),
                 ),
@@ -718,44 +703,35 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
         ),
         SizedBox(width: 14.w),
 
-        // Tombol Simpan (Disabled jika wajah belum sesuai)
+        // Tombol Simpan
         Expanded(
           child: SizedBox(
             height: 48.h,
             child: ElevatedButton.icon(
-              onPressed: canSave
-                  ? () {
-                      if (widget.onPhotoSaved != null) {
-                        widget.onPhotoSaved!(_capturedFile!);
-                      }
-                      Navigator.pop(context, _capturedFile);
-                    }
-                  : () {
-                      showCustomSnackBar(
-                        context,
-                        'Posisi wajah belum sesuai dengan frame. Silakan ulangi pemotretan.',
-                      );
-                    },
+              onPressed: () {
+                if (widget.onPhotoSaved != null) {
+                  widget.onPhotoSaved!(_capturedFile!);
+                }
+                Navigator.pop(context, _capturedFile);
+              },
               icon: Icon(
                 Icons.check_circle_outline_rounded,
                 size: 20.sp,
-                color: canSave ? Colors.white : const Color(0xFF94A3B8),
+                color: Colors.white,
               ),
               label: Text(
                 'Simpan',
                 style: TextStyle(
-                  color: canSave ? Colors.white : const Color(0xFF94A3B8),
+                  color: Colors.white,
                   fontFamily: 'PlusJakartaSans',
                   fontWeight: FontWeight.w700,
                   fontSize: 14.sp,
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: canSave
-                    ? const Color(0xFFFD990F)
-                    : const Color(0xFF334155),
-                disabledBackgroundColor: const Color(0xFF334155),
-                elevation: canSave ? 3 : 0,
+                backgroundColor: const Color(0xFFFD990F),
+                elevation: 0,
+                shadowColor: Colors.transparent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14.r),
                 ),
@@ -802,17 +778,17 @@ class CircleFaceFrameOverlayPainter extends CustomPainter {
     );
 
     final scrimPaint = Paint()
-      ..color = Colors.black.withOpacity(hasPhoto ? 0.20 : 0.65)
+      ..color = Colors.black.withOpacity(0.65)
       ..style = PaintingStyle.fill;
     canvas.drawPath(transparentHolePath, scrimPaint);
 
     // 2. Garis Lingkaran Hijau/Amber
     final Color circleColor = isAligned
-        ? const Color(0xFF10B981) // Hijau Emerald
+        ? const Color(0xFF10B981)
         : (status == SmartFaceFrameStatus.offCenter ||
                 status == SmartFaceFrameStatus.tooFar ||
                 status == SmartFaceFrameStatus.tooClose)
-            ? const Color(0xFFFD990F) // Amber
+            ? const Color(0xFFFD990F)
             : const Color(0xFF10B981).withOpacity(0.90);
 
     final circlePaint = Paint()
