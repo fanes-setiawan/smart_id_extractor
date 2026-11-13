@@ -106,6 +106,7 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
         performanceMode: FaceDetectorMode.accurate,
         enableLandmarks: true,
         enableClassification: true,
+        enableTracking: true,
         minFaceSize: 0.20,
       ),
     );
@@ -216,6 +217,56 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
 
       final Face face = faces.first;
       final Rect faceBox = face.boundingBox;
+
+      // Validasi Sudut Rotasi Kepala (Wajah Wajib Menghadap Depan)
+      // headEulerAngleY: Rotasi tengok kiri/kanan (+/- derajat). Jika menoleh ke samping, nilai |Y| > 12°
+      // headEulerAngleZ: Kemiringan kepala ke bahu (+/- derajat). Jika miring, nilai |Z| > 15°
+      // headEulerAngleX: Mendongak / menunduk (+/- derajat). Jika terlalu dongak/nunduk, nilai |X| > 15°
+      final double rotY = face.headEulerAngleY ?? 0.0;
+      final double rotZ = face.headEulerAngleZ ?? 0.0;
+      final double rotX = face.headEulerAngleX ?? 0.0;
+
+      if (rotY.abs() > 12.0) {
+        showCustomSnackBar(
+          context,
+          'Wajah harus menghadap lurus ke depan. Jangan menoleh ke samping.',
+        );
+        setState(() {
+          _frameStatus = SmartFaceFrameStatus.offCenter;
+          _isFaceAligned = false;
+          _guideTitle = 'Hadapkan wajah lurus ke depan';
+          _guideSubtitle = 'Hindari menoleh atau miring ke samping.';
+        });
+        return;
+      }
+
+      if (rotZ.abs() > 14.0) {
+        showCustomSnackBar(
+          context,
+          'Posisi kepala miring. Tegakkan kepala menghadap kamera.',
+        );
+        setState(() {
+          _frameStatus = SmartFaceFrameStatus.offCenter;
+          _isFaceAligned = false;
+          _guideTitle = 'Tegakkan posisi kepala Anda';
+          _guideSubtitle = 'Pastikan kepala sejajar lurus menghadap kamera.';
+        });
+        return;
+      }
+
+      if (rotX.abs() > 16.0) {
+        showCustomSnackBar(
+          context,
+          'Arahkan pandangan sejajar dengan kamera (tidak terlalu mendongak/menunduk).',
+        );
+        setState(() {
+          _frameStatus = SmartFaceFrameStatus.offCenter;
+          _isFaceAligned = false;
+          _guideTitle = 'Sejajarkan pandangan ke kamera';
+          _guideSubtitle = 'Arahkan wajah tegak lurus ke depan.';
+        });
+        return;
+      }
 
       // 2. Decode & Orientasi EXIF
       final rawBytes = await rawFile.readAsBytes();
@@ -436,19 +487,14 @@ class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
                           ),
                         ),
 
-                      // 2. Tampilan Hasil Foto (Bersih, Rapi, Frame Hilang)
+                      // 2. Tampilan Hasil Foto (Persegi 1:1 Bersih Tanpa Radius & Tanpa Border)
                       if (_capturedFile != null)
                         Container(
                           color: Colors.white,
                           alignment: Alignment.center,
-                          child: Container(
+                          child: SizedBox(
                             width: 280.w,
                             height: 280.w,
-                            clipBehavior: Clip.antiAlias,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(20.r),
-                            ),
                             child: Image.file(
                               _capturedFile!,
                               fit: BoxFit.cover,
