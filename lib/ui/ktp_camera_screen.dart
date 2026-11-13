@@ -1,3 +1,4 @@
+import 'custom_snackbar.dart';
 // ignore_for_file: deprecated_member_use
 
 import 'dart:io';
@@ -8,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../ktp_extractor.dart';
 import '../utils/utils.dart';
@@ -69,6 +71,8 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
 
   bool _isCapturing = false;
   bool _isDisposed = false;
+  bool _cameraPermissionDenied = false;
+  bool _cameraPermissionPermanentlyDenied = false;
   File? _capturedFreezeFile;
 
   late AnimationController _laserAnimationController;
@@ -122,10 +126,66 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
     }
   }
 
+  Future<void> _requestCameraPermissionAndInit() async {
+    final currentStatus = await Permission.camera.status;
+
+    if (currentStatus.isPermanentlyDenied) {
+      final opened = await openAppSettings();
+      if (!opened) {
+        await Permission.camera.request();
+      }
+      return;
+    }
+
+    final status = await Permission.camera.request();
+    if (status.isGranted) {
+      if (mounted) {
+        setState(() {
+          _cameraPermissionDenied = false;
+          _cameraPermissionPermanentlyDenied = false;
+        });
+      }
+      _initCamera();
+    } else if (status.isPermanentlyDenied) {
+      if (mounted) {
+        setState(() {
+          _cameraPermissionDenied = true;
+          _cameraPermissionPermanentlyDenied = true;
+        });
+      }
+      await openAppSettings();
+    } else {
+      if (mounted) {
+        setState(() {
+          _cameraPermissionDenied = true;
+          _cameraPermissionPermanentlyDenied = false;
+        });
+      }
+    }
+  }
+
   Future<void> _initCamera() async {
     if (_isDisposed || _isInitializingCamera) return;
     _isInitializingCamera = true;
     try {
+      final status = await Permission.camera.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          setState(() {
+            _cameraPermissionDenied = true;
+            _cameraPermissionPermanentlyDenied = status.isPermanentlyDenied;
+          });
+        }
+        return;
+      }
+
+      if (mounted && _cameraPermissionDenied) {
+        setState(() {
+          _cameraPermissionDenied = false;
+          _cameraPermissionPermanentlyDenied = false;
+        });
+      }
+
       _cameras = await availableCameras();
       if (_cameras.isEmpty) {
         return;
@@ -282,8 +342,28 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
         }
       }
 
-      // Crop user profile photo from the KTP card
       final File? photoFile = await KtpExtractor.cropKtpPhotoFile(finalImage);
+
+      final bool isValid = model.nik != null && model.nik!.length == 16;
+      if (!isValid) {
+        if (mounted && !_isDisposed) {
+          setState(() {
+            _isCapturing = false;
+            _capturedFreezeFile = null;
+          });
+          showCustomSnackBar(
+            context,
+            'Foto yang Anda ambil bukan dokumen KTP yang valid. Pastikan fisik e-KTP berada di dalam bingkai dan NIK terlihat jelas.',
+          );
+          if (widget.autoCapture &&
+              _controller != null &&
+              _controller!.value.isInitialized &&
+              !_controller!.value.isStreamingImages) {
+            _startImageStream();
+          }
+        }
+        return;
+      }
 
       if (mounted) {
         Navigator.of(context).pop(KtpCameraResult(
@@ -296,7 +376,12 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
       if (mounted && !_isDisposed) {
         setState(() {
           _isCapturing = false;
+          _capturedFreezeFile = null;
         });
+        showCustomSnackBar(
+          context,
+          'Terjadi kesalahan saat memproses gambar e-KTP. Silakan coba lagi.',
+        );
         if (widget.autoCapture &&
             _controller != null &&
             _controller!.value.isInitialized &&
@@ -367,8 +452,28 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
         }
       }
 
-      // Crop user profile photo from the KTP card
       final File? photoFile = await KtpExtractor.cropKtpPhotoFile(finalImage);
+
+      final bool isValid = model.nik != null && model.nik!.length == 16;
+      if (!isValid) {
+        if (mounted && !_isDisposed) {
+          setState(() {
+            _isCapturing = false;
+            _capturedFreezeFile = null;
+          });
+          showCustomSnackBar(
+            context,
+            'Foto yang Anda ambil bukan dokumen e-KTP yang valid. Pastikan fisik e-KTP berada di dalam bingkai dan NIK terlihat jelas.',
+          );
+          if (widget.autoCapture &&
+              _controller != null &&
+              _controller!.value.isInitialized &&
+              !_controller!.value.isStreamingImages) {
+            _startImageStream();
+          }
+        }
+        return;
+      }
 
       if (mounted) {
         Navigator.of(context).pop(KtpCameraResult(
@@ -381,7 +486,12 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
       if (mounted && !_isDisposed) {
         setState(() {
           _isCapturing = false;
+          _capturedFreezeFile = null;
         });
+        showCustomSnackBar(
+          context,
+          'Terjadi kesalahan saat memproses gambar e-KTP. Silakan coba lagi.',
+        );
         if (widget.autoCapture &&
             _controller != null &&
             _controller!.value.isInitialized &&
@@ -412,535 +522,617 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: const Size(390, 844),
-      minTextAdapt: true,
-      splitScreenMode: true,
-      builder: (context, child) {
-        final double cardWidth = 358.w;
-        final double cardHeight = cardWidth / 1.5858;
+    final double cardWidth = 358.w;
+    final double cardHeight = cardWidth / 1.5858;
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF9F9FF),
-          body: Stack(
-            fit: StackFit.expand,
-            children: [
-              SafeArea(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      physics: const ClampingScrollPhysics(),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9F9FF),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. Top Header Bar: Chevron Back + Title
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 10.h,
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: const Color(0xFF111C2D),
+                          size: 20.sp,
                         ),
-                        child: IntrinsicHeight(
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Text(
+                          widget.headerTitle,
+                          style: TextStyle(
+                            fontFamily: 'Plus Jakarta Sans',
+                            color: const Color(0xFF0B3866),
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Middle scrollable section: Title, Viewfinder & Panduan
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    padding: EdgeInsets.symmetric(vertical: 4.h),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 2. Title & Instruction Subtitle
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20.w),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // 1. Top Header Bar: Chevron Back + Title
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  // horizontal: 16.w,
-                                  vertical: 6.h,
-                                ),
-                                child: Row(
-                                  children: [
-                                    IconButton(
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
-                                      icon: Icon(
-                                        Icons.arrow_back_ios_new_rounded,
-                                        color: const Color(0xFF111C2D),
-                                        size: 20.sp,
-                                      ),
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                    ),
-                                    SizedBox(width: 14.w),
-                                    Expanded(
-                                      child: Text(
-                                        widget.headerTitle,
-                                        style: TextStyle(
-                                          fontFamily: 'PlusJakartaSans',
-                                          color: const Color(0xFF0B3866),
-                                          fontSize: 18.sp,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                              Text(
+                                widget.title != null &&
+                                        widget.title != 'Auto-Capture' &&
+                                        widget.title != 'Manual Shutter'
+                                    ? widget.title!
+                                    : 'Posisikan e-KTP di Dalam Bingkai',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'Plus Jakarta Sans',
+                                  color: const Color(0xFF0F172A),
+                                  fontSize: 15.sp,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.3,
                                 ),
                               ),
-
                               SizedBox(height: 6.h),
-
-                              // 2. Title & Instruction Subtitle
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 20.w),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      widget.title != null &&
-                                              widget.title != 'Auto-Capture' &&
-                                              widget.title != 'Manual Shutter'
-                                          ? widget.title!
-                                          : 'Posisikan e-KTP di Dalam Bingkai',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontFamily: 'PlusJakartaSans',
-                                        color: const Color(0xFF002245),
-                                        fontSize: 18.5.sp,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -0.3,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4.h),
-                                    Text(
-                                      widget.subtitle ??
-                                          'Sejajarkan 4 sudut kartu dan pastikan NIK terlihat jelas',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontFamily: 'PlusJakartaSans',
-                                        color: const Color(0xFF43474F),
-                                        fontSize: 12.sp,
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                    ),
-                                  ],
+                              Text(
+                                widget.subtitle ??
+                                    'Sejajarkan 4 sudut kartu dan pastikan NIK terlihat jelas',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'Plus Jakarta Sans',
+                                  color: const Color(0xFF64748B),
+                                  fontSize: 11.sp,
+                                  fontWeight: FontWeight.w400,
+                                  height: 1.35,
                                 ),
                               ),
-
-                              SizedBox(height: 14.h),
-
-                              // 3. Static/Fixed KTP Card Viewfinder Frame
-                              Center(
-                                child: Container(
-                                  width: cardWidth,
-                                  height: cardHeight,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(20.r),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFF002245)
-                                            .withOpacity(0.12),
-                                        blurRadius: 20.r,
-                                        offset: Offset(0, 8.h),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(20.r),
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        // 3a. Camera Preview / Frozen Captured Picture
-                                        _capturedFreezeFile != null
-                                            ? Image.file(
-                                                _capturedFreezeFile!,
-                                                fit: BoxFit.cover,
-                                              )
-                                            : _controller != null &&
-                                                _controller!
-                                                    .value.isInitialized &&
-                                                !_isDisposed
-                                            ? GestureDetector(
-                                                onTapDown: (TapDownDetails
-                                                    details) async {
-                                                  final controller =
-                                                      _controller;
-                                                  if (controller == null ||
-                                                      !controller.value
-                                                          .isInitialized) {
-                                                    return;
-                                                  }
-                                                  try {
-                                                    final offset = Offset(
-                                                      (details.localPosition
-                                                                  .dx /
-                                                              cardWidth)
-                                                          .clamp(0.0, 1.0),
-                                                      (details.localPosition
-                                                                  .dy /
-                                                              cardHeight)
-                                                          .clamp(0.0, 1.0),
-                                                    );
-                                                    await controller
-                                                        .setFocusPoint(offset);
-                                                    await controller
-                                                        .setFocusMode(
-                                                            FocusMode.auto);
-                                                  } catch (_) {}
-                                                },
-                                                child: FittedBox(
-                                                  fit: BoxFit.cover,
-                                                  child: SizedBox(
-                                                    width: _controller!
-                                                            .value
-                                                            .previewSize
-                                                            ?.height ??
-                                                        cardWidth,
-                                                    height: _controller!
-                                                            .value
-                                                            .previewSize
-                                                            ?.width ??
-                                                        cardHeight,
-                                                    child: CameraPreview(
-                                                        _controller!),
-                                                  ),
-                                                ),
-                                              )
-                                            : Container(
-                                                color: const Color(0xFF111C2D),
-                                                child: Center(
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    valueColor:
-                                                        AlwaysStoppedAnimation<
-                                                            Color>(
-                                                      widget.loadingColor,
-                                                    ),
-                                                    strokeWidth: 2.5,
-                                                  ),
-                                                ),
-                                              ),
-
-                                        // 3b. KTP Guide Overlay (Watermark, Text, Orange Corners, Laser Scan)
-                                        IgnorePointer(
-                                          child: AnimatedBuilder(
-                                            animation: _laserAnimation,
-                                            builder: (context, child) {
-                                              final bool isCameraActive =
-                                                  _controller != null &&
-                                                      _controller!.value
-                                                          .isInitialized &&
-                                                      !_isDisposed;
-                                              return CustomPaint(
-                                                size:
-                                                    Size(cardWidth, cardHeight),
-                                                painter:
-                                                    _KtpCardWatermarkAndGuidePainter(
-                                                  laserProgress:
-                                                      _laserAnimation.value,
-                                                  isLocked: false,
-                                                  focusProgress: 0.0,
-                                                  showWatermark:
-                                                      !isCameraActive,
-                                                  showLaser: widget.autoCapture,
-                                                  cornerRadius: 20.r,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              SizedBox(height: 16.h),
-
-                              // 4. "Panduan Pindai Maksimal" Info Card
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 20.w),
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 16.w,
-                                    vertical: 14.h,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFFFFF),
-                                    borderRadius: BorderRadius.circular(18.r),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      // Card Header
-                                      Row(
-                                        children: [
-                                          SvgPicture.asset(
-                                            'assets/icons/ic_lamp.svg',
-                                            package: 'smart_id_extractor',
-                                            width: 18.r,
-                                            height: 18.r,
-                                          ),
-                                          SizedBox(width: 8.w),
-                                          Text(
-                                            'Panduan Pindai Maksimal',
-                                            style: TextStyle(
-                                              fontFamily: 'PlusJakartaSans',
-                                              color: const Color(0xFF002245),
-                                              fontSize: 14.sp,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: 10.h),
-
-                                      // Tip Item 1
-                                      Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Container(
-                                            width: 17.r,
-                                            height: 17.r,
-                                            margin: EdgeInsets.only(top: 1.5.h),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF002245)
-                                                  .withOpacity(0.08),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                '1',
-                                                style: TextStyle(
-                                                  fontFamily: 'PlusJakartaSans',
-                                                  color:
-                                                      const Color(0xFF43474F),
-                                                  fontSize: 10.sp,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          SizedBox(width: 9.w),
-                                          Expanded(
-                                            child: Text(
-                                              'Hindari kilatan sinar lampu langsung atau pantulan kaca hologram pada permukaan e-KTP.',
-                                              style: TextStyle(
-                                                fontFamily: 'PlusJakartaSans',
-                                                color: const Color(0xFF43474F),
-                                                fontSize: 11.8.sp,
-                                                height: 1.35,
-                                                fontWeight: FontWeight.w400,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: 8.h),
-
-                                      // Tip Item 2
-                                      Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Container(
-                                            width: 17.r,
-                                            height: 17.r,
-                                            margin: EdgeInsets.only(top: 1.5.h),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF002245)
-                                                  .withOpacity(0.08),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                '2',
-                                                style: TextStyle(
-                                                  fontFamily: 'PlusJakartaSans',
-                                                  color:
-                                                      const Color(0xFF43474F),
-                                                  fontSize: 10.sp,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          SizedBox(width: 9.w),
-                                          Expanded(
-                                            child: Text(
-                                              'Letakkan e-KTP di atas bidang datar dengan latar belakang gelap kontras.',
-                                              style: TextStyle(
-                                                fontFamily: 'PlusJakartaSans',
-                                                color: const Color(0xFF43474F),
-                                                fontSize: 11.8.sp,
-                                                height: 1.35,
-                                                fontWeight: FontWeight.w400,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-
-                              const Spacer(),
-
-                              // 5. Bottom Row Controls: Galeri, Shutter Button, Isi Manual
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 28.w),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    // Galeri Button
-                                    _buildSvgActionButton(
-                                      svgPath: 'assets/icons/ic_galeri.svg',
-                                      label: 'Galeri',
-                                      onTap: _pickFromGallery,
-                                    ),
-
-                                    // Center Orange Shutter Button
-                                    GestureDetector(
-                                      onTap: () =>
-                                          _triggerCapture(isAuto: false),
-                                      child: Container(
-                                        width: 80.r,
-                                        height: 80.r,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: const Color(0xFFFD990F)
-                                              .withOpacity(0.18),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: const Color(0xFFFD990F)
-                                                  .withOpacity(0.22),
-                                              blurRadius: 16.r,
-                                              spreadRadius: 2.r,
-                                              offset: Offset(0, 3.h),
-                                            ),
-                                          ],
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Container(
-                                          width: 66.r,
-                                          height: 66.r,
-                                          decoration: const BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Color(0xFF002245),
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Container(
-                                            width: 56.r,
-                                            height: 56.r,
-                                            decoration: const BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: Color(0xFFFD990F),
-                                            ),
-                                            alignment: Alignment.center,
-                                            child: SvgPicture.asset(
-                                              'assets/icons/ic_camera.svg',
-                                              package: 'smart_id_extractor',
-                                              width: 26.r,
-                                              height: 26.r,
-                                              colorFilter:
-                                                  const ColorFilter.mode(
-                                                Color(0xFFFFFFFF),
-                                                BlendMode.srcIn,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-
-                                    // Isi Manual Button
-                                    _buildSvgActionButton(
-                                      svgPath: 'assets/icons/ic_note.svg',
-                                      label: 'Isi Manual',
-                                      onTap: () {
-                                        if (widget.onManualInput != null) {
-                                          widget.onManualInput!();
-                                        } else {
-                                          Navigator.of(context).pop();
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              SizedBox(height: 14.h),
-
-                              // 6. Security & Privacy Note Footer
-                              Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 28.w),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.shield_outlined,
-                                      size: 13.sp,
-                                      color: const Color(0xFF43474F)
-                                          .withOpacity(0.85),
-                                    ),
-                                    SizedBox(width: 5.w),
-                                    Text(
-                                      'KEBIJAKAN PRIVASI INDOPSIKO',
-                                      style: TextStyle(
-                                        fontFamily: 'PlusJakartaSans',
-                                        color: const Color(0xFF43474F),
-                                        fontSize: 10.sp,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              SizedBox(height: 10.h),
                             ],
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
 
-              // 7. Processing Loading Screen (Simpel: Circle loading dibungkus container)
-              if (_isCapturing)
-                Container(
-                  color: Colors.black.withOpacity(0.35),
-                  child: Center(
-                    child: Container(
-                      width: 68.r,
-                      height: 68.r,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16.r),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.12),
-                            blurRadius: 16.r,
-                            offset: Offset(0, 4.h),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 32.r,
-                              height: 32.r,
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  widget.loadingColor,
+                        SizedBox(height: 14.h),
+
+                        // 3. Static/Fixed KTP Card Viewfinder Frame
+                        Center(
+                          child: Container(
+                            width: cardWidth,
+                            height: cardHeight,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20.r),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      const Color(0xFF002245).withOpacity(0.12),
+                                  blurRadius: 20.r,
+                                  offset: Offset(0, 8.h),
                                 ),
-                                strokeWidth: 3.2,
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20.r),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  // 3a. Camera Preview / Frozen Captured Picture
+                                  _capturedFreezeFile != null
+                                      ? Image.file(
+                                          _capturedFreezeFile!,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : _controller != null &&
+                                              _controller!
+                                                  .value.isInitialized &&
+                                              !_isDisposed
+                                          ? GestureDetector(
+                                              onTapDown: (TapDownDetails
+                                                  details) async {
+                                                final controller = _controller;
+                                                if (controller == null ||
+                                                    !controller
+                                                        .value.isInitialized) {
+                                                  return;
+                                                }
+                                                try {
+                                                  final offset = Offset(
+                                                    (details.localPosition.dx /
+                                                            cardWidth)
+                                                        .clamp(0.0, 1.0),
+                                                    (details.localPosition.dy /
+                                                            cardHeight)
+                                                        .clamp(0.0, 1.0),
+                                                  );
+                                                  await controller
+                                                      .setFocusPoint(offset);
+                                                  await controller.setFocusMode(
+                                                      FocusMode.auto);
+                                                } catch (_) {}
+                                              },
+                                              child: FittedBox(
+                                                fit: BoxFit.cover,
+                                                child: SizedBox(
+                                                  width: _controller!
+                                                          .value
+                                                          .previewSize
+                                                          ?.height ??
+                                                      cardWidth,
+                                                  height: _controller!.value
+                                                          .previewSize?.width ??
+                                                      cardHeight,
+                                                  child: CameraPreview(
+                                                      _controller!),
+                                                ),
+                                              ),
+                                            )
+                                          : _cameraPermissionDenied
+                                              ? Container(
+                                                  color:
+                                                      const Color(0xFF111C2D),
+                                                  padding: EdgeInsets.symmetric(
+                                                      horizontal: 20.w),
+                                                  child: Center(
+                                                    child: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons
+                                                              .no_photography_outlined,
+                                                          color: const Color(
+                                                              0xFFFD990F),
+                                                          size: 38.r,
+                                                        ),
+                                                        SizedBox(height: 10.h),
+                                                        Text(
+                                                          'Izin Kamera Belum Diberikan',
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          style: TextStyle(
+                                                            fontFamily:
+                                                                'Plus Jakarta Sans',
+                                                            color: Colors.white,
+                                                            fontSize: 13.sp,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                        ),
+                                                        SizedBox(height: 6.h),
+                                                        Text(
+                                                          'Aplikasi memerlukan izin akses kamera untuk memindai dokumen fisik e-KTP.',
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          style: TextStyle(
+                                                            fontFamily:
+                                                                'Plus Jakarta Sans',
+                                                            color: Colors.white
+                                                                .withOpacity(
+                                                                    0.75),
+                                                            fontSize: 11.sp,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                        SizedBox(height: 12.h),
+                                                        ElevatedButton(
+                                                          onPressed:
+                                                              _requestCameraPermissionAndInit,
+                                                          style: ElevatedButton
+                                                              .styleFrom(
+                                                            backgroundColor:
+                                                                const Color(
+                                                                    0xFFFD990F),
+                                                            foregroundColor:
+                                                                Colors.white,
+                                                            padding: EdgeInsets
+                                                                .symmetric(
+                                                                    horizontal:
+                                                                        16.w,
+                                                                    vertical:
+                                                                        8.h),
+                                                            shape:
+                                                                RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          10.r),
+                                                            ),
+                                                          ),
+                                                          child: Text(
+                                                            _cameraPermissionPermanentlyDenied
+                                                                ? 'Buka Pengaturan Kamera'
+                                                                : 'Izinkan Kamera',
+                                                            style: TextStyle(
+                                                              fontFamily:
+                                                                  'Plus Jakarta Sans',
+                                                              fontSize: 11.5.sp,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                )
+                                              : Container(
+                                                  color:
+                                                      const Color(0xFF111C2D),
+                                                  child: Center(
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                              Color>(
+                                                        widget.loadingColor,
+                                                      ),
+                                                      strokeWidth: 2.5,
+                                                    ),
+                                                  ),
+                                                ),
+
+                                  // 3b. KTP Guide Overlay (Watermark, Text, Orange Corners, Laser Scan)
+                                  // Jangan tampilkan watermark saat permission kamera ditolak agar tidak bertumpukan dengan teks dialog/tombol
+                                  if (!_cameraPermissionDenied)
+                                    IgnorePointer(
+                                      child: AnimatedBuilder(
+                                        animation: _laserAnimation,
+                                        builder: (context, child) {
+                                          final bool isCameraActive =
+                                              _controller != null &&
+                                                  _controller!
+                                                      .value.isInitialized &&
+                                                  !_isDisposed;
+                                          return CustomPaint(
+                                            size: Size(cardWidth, cardHeight),
+                                            painter:
+                                                _KtpCardWatermarkAndGuidePainter(
+                                              laserProgress:
+                                                  _laserAnimation.value,
+                                              isLocked: false,
+                                              focusProgress: 0.0,
+                                              showWatermark: !isCameraActive,
+                                              showLaser: widget.autoCapture &&
+                                                  isCameraActive,
+                                              cornerRadius: 20.r,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(height: 16.h),
+
+                        // 4. "Panduan Pindai Maksimal" Info Card
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20.w),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 14.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFFFF),
+                              borderRadius: BorderRadius.circular(18.r),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Card Header
+                                Row(
+                                  children: [
+                                    SvgPicture.asset(
+                                      'assets/icons/ic_lamp.svg',
+                                      package: 'smart_id_extractor',
+                                      width: 18.r,
+                                      height: 18.r,
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Text(
+                                      'Panduan Pindai Maksimal',
+                                      style: TextStyle(
+                                        fontFamily: 'Plus Jakarta Sans',
+                                        color: const Color(0xFF002245),
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 10.h),
+
+                                // Tip Item 1
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 17.r,
+                                      height: 17.r,
+                                      margin: EdgeInsets.only(top: 1.5.h),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF002245)
+                                            .withOpacity(0.08),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '1',
+                                          style: TextStyle(
+                                            fontFamily: 'Plus Jakarta Sans',
+                                            color: const Color(0xFF43474F),
+                                            fontSize: 10.sp,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 9.w),
+                                    Expanded(
+                                      child: Text(
+                                        'Hindari kilatan sinar lampu langsung atau pantulan kaca hologram pada permukaan e-KTP.',
+                                        style: TextStyle(
+                                          fontFamily: 'Plus Jakarta Sans',
+                                          color: const Color(0xFF43474F),
+                                          fontSize: 11.8.sp,
+                                          height: 1.35,
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 8.h),
+
+                                // Tip Item 2
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 17.r,
+                                      height: 17.r,
+                                      margin: EdgeInsets.only(top: 1.5.h),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF002245)
+                                            .withOpacity(0.08),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '2',
+                                          style: TextStyle(
+                                            fontFamily: 'Plus Jakarta Sans',
+                                            color: const Color(0xFF43474F),
+                                            fontSize: 10.sp,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 9.w),
+                                    Expanded(
+                                      child: Text(
+                                        'Letakkan e-KTP di atas bidang datar dengan latar belakang gelap kontras.',
+                                        style: TextStyle(
+                                          fontFamily: 'Plus Jakarta Sans',
+                                          color: const Color(0xFF43474F),
+                                          fontSize: 11.8.sp,
+                                          height: 1.35,
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(height: 10.h),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // 5. Fixed Bottom Section: Shutter Row & Privacy Note
+                Container(
+                  padding: EdgeInsets.only(top: 6.h, bottom: 10.h),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9F9FF),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF002245).withOpacity(0.04),
+                        blurRadius: 10.r,
+                        offset: Offset(0, -3.h),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 28.w),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Galeri Button
+                            _buildSvgActionButton(
+                              svgPath: 'assets/icons/ic_galeri.svg',
+                              label: 'Galeri',
+                              onTap: _pickFromGallery,
+                            ),
+
+                            // Center Orange Shutter Button
+                            GestureDetector(
+                              onTap: () => _triggerCapture(isAuto: false),
+                              child: Container(
+                                width: 80.r,
+                                height: 80.r,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color:
+                                      const Color(0xFFFD990F).withOpacity(0.18),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFFD990F)
+                                          .withOpacity(0.22),
+                                      blurRadius: 16.r,
+                                      spreadRadius: 2.r,
+                                      offset: Offset(0, 3.h),
+                                    ),
+                                  ],
+                                ),
+                                alignment: Alignment.center,
+                                child: Container(
+                                  width: 66.r,
+                                  height: 66.r,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Color(0xFF002245),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Container(
+                                    width: 56.r,
+                                    height: 56.r,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Color(0xFFFD990F),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: SvgPicture.asset(
+                                      'assets/icons/ic_camera.svg',
+                                      package: 'smart_id_extractor',
+                                      width: 26.r,
+                                      height: 26.r,
+                                      colorFilter: const ColorFilter.mode(
+                                        Color(0xFFFFFFFF),
+                                        BlendMode.srcIn,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Isi Manual Button
+                            _buildSvgActionButton(
+                              svgPath: 'assets/icons/ic_note.svg',
+                              label: 'Isi Manual',
+                              onTap: () {
+                                if (widget.onManualInput != null) {
+                                  widget.onManualInput!();
+                                } else {
+                                  Navigator.of(context).pop();
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: 14.h),
+
+                      // 6. Security & Privacy Note Footer
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 28.w),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.shield_outlined,
+                              size: 13.sp,
+                              color: const Color(0xFF43474F).withOpacity(0.85),
+                            ),
+                            SizedBox(width: 5.w),
+                            Text(
+                              'KEBIJAKAN PRIVASI INDOPSIKO',
+                              style: TextStyle(
+                                fontFamily: 'Plus Jakarta Sans',
+                                color: const Color(0xFF43474F),
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ],
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 7. Processing Loading Screen (Simpel: Circle loading dibungkus container)
+          if (_isCapturing)
+            Container(
+              color: Colors.black.withOpacity(0.35),
+              child: Center(
+                child: Container(
+                  width: 68.r,
+                  height: 68.r,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.12),
+                        blurRadius: 16.r,
+                        offset: Offset(0, 4.h),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 32.r,
+                          height: 32.r,
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              widget.loadingColor,
+                            ),
+                            strokeWidth: 3.2,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-            ],
-          ),
-        );
-      },
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -982,7 +1174,7 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
           Text(
             label,
             style: TextStyle(
-              fontFamily: 'PlusJakartaSans',
+              fontFamily: 'Plus Jakarta Sans',
               color: const Color(0xFF002245),
               fontSize: 12.sp,
               fontWeight: FontWeight.w600,

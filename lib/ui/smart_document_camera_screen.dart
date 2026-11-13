@@ -163,6 +163,26 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
     _initCamera();
   }
 
+  Future<void> _requestCameraPermissionAndInit() async {
+    final status = await Permission.camera.request();
+    if (status.isGranted) {
+      if (mounted) {
+        setState(() {
+          _cameraPermissionDenied = false;
+          _cameraPermissionPermanentlyDenied = false;
+        });
+      }
+      _initCamera(manualRetry: true);
+    } else {
+      if (mounted) {
+        setState(() {
+          _cameraPermissionDenied = true;
+          _cameraPermissionPermanentlyDenied = status.isPermanentlyDenied;
+        });
+      }
+    }
+  }
+
   Future<void> _initCamera({bool manualRetry = false}) async {
     if (_isInitializingCamera) return;
     _isInitializingCamera = true;
@@ -659,20 +679,15 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: const Size(390, 844),
-      minTextAdapt: true,
-      splitScreenMode: true,
-      builder: (context, child) {
-        return Scaffold(
-          backgroundColor: const Color(0xFFF9F9FF),
-          body: Stack(
-            fit: StackFit.expand,
-            children: [
-              SafeArea(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9F9FF),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                     // 1. Top Header Bar: Back Chevron + Title
                     _buildTopBar(),
 
@@ -779,13 +794,11 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
             ],
           ),
         );
-      },
-    );
   }
 
   Widget _buildTopBar() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
       child: Row(
         children: [
           if (widget.showBackButton) ...[
@@ -799,17 +812,16 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
               ),
               onPressed: () => Navigator.of(context).pop(),
             ),
-            SizedBox(width: 14.w),
+            SizedBox(width: 12.w),
           ],
           Expanded(
             child: Text(
               widget.headerTitle ?? widget.documentType.defaultTitle,
               style: TextStyle(
-                fontFamily: 'PlusJakartaSans',
+                fontFamily: 'Plus Jakarta Sans',
                 color: const Color(0xFF0B3866),
-                fontSize: 18.sp,
+                fontSize: 16.sp,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.1,
               ),
             ),
           ),
@@ -911,7 +923,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                                 'Izin Kamera Belum Diberikan',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontFamily: 'PlusJakartaSans',
+                                  fontFamily: 'Plus Jakarta Sans',
                                   color: Colors.white,
                                   fontSize: 13.sp,
                                   fontWeight: FontWeight.w700,
@@ -922,7 +934,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                                 'Aplikasi memerlukan izin akses kamera untuk memindai dokumen fisik.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontFamily: 'PlusJakartaSans',
+                                  fontFamily: 'Plus Jakarta Sans',
                                   color: Colors.white.withOpacity(0.75),
                                   fontSize: 11.sp,
                                   fontWeight: FontWeight.w500,
@@ -930,28 +942,20 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                               ),
                               SizedBox(height: 12.h),
                               ElevatedButton(
-                                onPressed: () async {
-                                  if (_cameraPermissionPermanentlyDenied) {
-                                    await openAppSettings();
-                                  } else {
-                                    _initCamera();
-                                  }
-                                },
+                                onPressed: _requestCameraPermissionAndInit,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFFD990F),
                                   foregroundColor: Colors.white,
                                   padding: EdgeInsets.symmetric(
-                                      horizontal: 14.w, vertical: 8.h),
+                                      horizontal: 16.w, vertical: 8.h),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10.r),
                                   ),
                                 ),
                                 child: Text(
-                                  _cameraPermissionPermanentlyDenied
-                                      ? 'Buka Pengaturan'
-                                      : 'Izinkan Kamera',
+                                  'Izinkan Kamera',
                                   style: TextStyle(
-                                    fontFamily: 'PlusJakartaSans',
+                                    fontFamily: 'Plus Jakarta Sans',
                                     fontSize: 11.5.sp,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -979,7 +983,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                                 'Kamera Gagal Dimuat',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontFamily: 'PlusJakartaSans',
+                                  fontFamily: 'Plus Jakarta Sans',
                                   color: Colors.white,
                                   fontSize: 13.sp,
                                   fontWeight: FontWeight.w700,
@@ -990,7 +994,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                                 'Sensor kamera sedang sibuk atau tidak merespons.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontFamily: 'PlusJakartaSans',
+                                  fontFamily: 'Plus Jakarta Sans',
                                   color: Colors.white.withOpacity(0.75),
                                   fontSize: 11.sp,
                                   fontWeight: FontWeight.w500,
@@ -1013,7 +1017,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                                 child: Text(
                                   'Coba Lagi',
                                   style: TextStyle(
-                                    fontFamily: 'PlusJakartaSans',
+                                    fontFamily: 'Plus Jakarta Sans',
                                     fontSize: 11.5.sp,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -1036,7 +1040,9 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                       ),
 
                     // 2. Custom Watermark & Corners Painter
-                    if (_capturedImageFile == null)
+                    if (_capturedImageFile == null &&
+                        !_cameraPermissionDenied &&
+                        !_cameraInitFailed)
                       IgnorePointer(
                         child: AnimatedBuilder(
                           animation: _laserAnimation,
@@ -1111,7 +1117,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                         widget.documentType.viewfinderHint,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontFamily: 'PlusJakartaSans',
+                          fontFamily: 'Plus Jakarta Sans',
                           color: Colors.white,
                           fontSize: 11.sp,
                           fontWeight: FontWeight.w600,
@@ -1150,7 +1156,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
               Text(
                 label,
                 style: TextStyle(
-                  fontFamily: 'PlusJakartaSans',
+                  fontFamily: 'Plus Jakarta Sans',
                   color: Colors.white,
                   fontSize: 11.sp,
                   fontWeight: FontWeight.w600,
@@ -1197,7 +1203,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                   child: Text(
                     title,
                     style: TextStyle(
-                      fontFamily: 'PlusJakartaSans',
+                      fontFamily: 'Plus Jakarta Sans',
                       color: const Color(0xFF002245),
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w700,
@@ -1228,7 +1234,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                       child: Text(
                         tip,
                         style: TextStyle(
-                          fontFamily: 'PlusJakartaSans',
+                          fontFamily: 'Plus Jakarta Sans',
                           color: const Color(0xFF43474F),
                           fontSize: 11.sp,
                           height: 1.3,
@@ -1258,7 +1264,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                             ? 'Sembunyikan panduan'
                             : 'Lanjutkan membaca...',
                         style: TextStyle(
-                          fontFamily: 'PlusJakartaSans',
+                          fontFamily: 'Plus Jakarta Sans',
                           color: const Color(0xFFFD990F),
                           fontSize: 11.5.sp,
                           fontWeight: FontWeight.w700,
@@ -1321,7 +1327,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                     Text(
                       'Galeri',
                       style: TextStyle(
-                        fontFamily: 'PlusJakartaSans',
+                        fontFamily: 'Plus Jakarta Sans',
                         color: const Color(0xFF002245),
                         fontSize: 11.sp,
                         fontWeight: FontWeight.w600,
@@ -1387,7 +1393,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
               Text(
                 _capturedImageFile != null ? 'Ulangi' : widget.documentType.shutterLabel,
                 style: TextStyle(
-                  fontFamily: 'PlusJakartaSans',
+                  fontFamily: 'Plus Jakarta Sans',
                   color: const Color(0xFF0B3866),
                   fontSize: 12.5.sp,
                   fontWeight: FontWeight.w700,
@@ -1433,7 +1439,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
               Text(
                 label,
                 style: TextStyle(
-                  fontFamily: 'PlusJakartaSans',
+                  fontFamily: 'Plus Jakarta Sans',
                   color: Colors.white,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w700,
@@ -1469,7 +1475,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
               Text(
                 label,
                 style: TextStyle(
-                  fontFamily: 'PlusJakartaSans',
+                  fontFamily: 'Plus Jakarta Sans',
                   color: const Color(0xFF64748B),
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w600,
