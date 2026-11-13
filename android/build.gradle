@@ -29,7 +29,7 @@ android {
         namespace = "com.irfan.smart_extractor_pro"
     }
 
-    compileSdk = 34
+    compileSdk = 35
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

@@ -47,7 +47,7 @@ class DocumentExtractorApp extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        cardTheme: const CardThemeData(
+        cardTheme: const CardTheme(
           color: Colors.white,
           elevation: 0,
           margin: EdgeInsets.zero,
@@ -97,13 +97,14 @@ class _MainScreenState extends State<MainScreen>
   bool _isProcessingSim = false;
 
   File? _passportImage;
+  File? _faceProfileImage;
   PassportModel? _passportModel;
   bool _isProcessingPassport = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -205,6 +206,17 @@ class _MainScreenState extends State<MainScreen>
                       ],
                     ),
                   ),
+                  Tab(
+                    iconMargin: EdgeInsets.zero,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.face_retouching_natural_rounded, size: 17),
+                        SizedBox(width: 6),
+                        Text('Foto Profil'),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -219,6 +231,7 @@ class _MainScreenState extends State<MainScreen>
           _buildKkTab(),
           _buildSuratSehatTab(),
           _buildPassportTab(),
+          _buildFaceProfileTab(),
         ],
       ),
     );
@@ -908,6 +921,225 @@ class _MainScreenState extends State<MainScreen>
         ],
         const SizedBox(height: 32),
       ],
+    );
+  }
+
+  Widget _buildFaceProfileTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF071426), Color(0xFF0B3866)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0B3866).withOpacity(0.25),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFD990F).withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFFD990F),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.face_retouching_natural_rounded,
+                    color: Color(0xFFFD990F),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Kamera Panduan Wajah',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Bingkai oval dengan deteksi wajah real-time. Tombol simpan otomatis disabled bila wajah belum pas.',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  if (_faceProfileImage != null) ...[
+                    Container(
+                      width: 180,
+                      height: 240,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(90),
+                        border: Border.all(
+                          color: const Color(0xFF10B981),
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF10B981).withOpacity(0.2),
+                            blurRadius: 15,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(90),
+                        child: Image.file(
+                          _faceProfileImage!,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle_rounded,
+                            color: Color(0xFF10B981), size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Posisi Wajah Terverifikasi',
+                          style: TextStyle(
+                            color: Color(0xFF10B981),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    Container(
+                      width: 160,
+                      height: 215,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(80),
+                        border: Border.all(
+                          color: const Color(0xFFCBD5E1),
+                          width: 2,
+                        ),
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.portrait_rounded,
+                            size: 64,
+                            color: Color(0xFF94A3B8),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Belum ada foto',
+                            style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0B3866),
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.camera_alt_rounded),
+                      label: Text(
+                        _faceProfileImage == null
+                            ? 'Buka Kamera Wajah (Oval Frame)'
+                            : 'Ambil Ulang Foto Wajah',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      onPressed: () async {
+                        final File? result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SmartFaceCameraScreen(
+                              title: 'Uji Foto Profil',
+                            ),
+                          ),
+                        );
+                        if (result != null && mounted) {
+                          setState(() {
+                            _faceProfileImage = result;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  if (_faceProfileImage != null) ...[
+                    const SizedBox(height: 10),
+                    TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _faceProfileImage = null;
+                        });
+                      },
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          size: 18, color: Color(0xFFEF4444)),
+                      label: const Text(
+                        'Hapus Foto',
+                        style: TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
