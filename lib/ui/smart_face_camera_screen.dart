@@ -29,7 +29,7 @@ enum SmartFaceFrameStatus {
 /// - Saat foto berhasil diambil: Card rapi tanpa radius border, tombol Ulangi & Simpan siap pakai
 /// - Validasi ketat: Wajah manusia wajib menghadap lurus ke depan (Euler Angle Y/Z/X)
 /// - Output konsisten: 720 × 720 px (1:1), JPEG Quality 85%, 100–300 KB
-class SmartFaceCameraScreen extends StatelessWidget {
+class SmartFaceCameraScreen extends StatefulWidget {
   final String title;
   final String subtitle;
   final ValueChanged<File>? onPhotoSaved;
@@ -42,38 +42,10 @@ class SmartFaceCameraScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: const Size(375, 812),
-      minTextAdapt: true,
-      splitScreenMode: true,
-      builder: (context, child) {
-        return _SmartFaceCameraView(
-          title: title,
-          subtitle: subtitle,
-          onPhotoSaved: onPhotoSaved,
-        );
-      },
-    );
-  }
+  State<SmartFaceCameraScreen> createState() => _SmartFaceCameraScreenState();
 }
 
-class _SmartFaceCameraView extends StatefulWidget {
-  final String title;
-  final String subtitle;
-  final ValueChanged<File>? onPhotoSaved;
-
-  const _SmartFaceCameraView({
-    required this.title,
-    required this.subtitle,
-    this.onPhotoSaved,
-  });
-
-  @override
-  State<_SmartFaceCameraView> createState() => _SmartFaceCameraViewState();
-}
-
-class _SmartFaceCameraViewState extends State<_SmartFaceCameraView>
+class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
     with WidgetsBindingObserver {
   CameraController? _controller;
   List<CameraDescription> _availableCameras = [];
