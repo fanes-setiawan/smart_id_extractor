@@ -523,12 +523,12 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
               if (_capturedFile == null)
                 Positioned(
                   bottom: 12.h,
-                  left: 20.w,
-                  right: 20.w,
+                  left: 12.w,
+                  right: 12.w,
                   child: Center(
                     child: Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: 14.w,
+                        horizontal: 10.w,
                         vertical: 6.h,
                       ),
                       decoration: BoxDecoration(
@@ -541,16 +541,20 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
                           Icon(
                             Icons.crop_free_rounded,
                             color: Colors.white,
-                            size: 16.sp,
+                            size: 14.sp,
                           ),
-                          SizedBox(width: 6.w),
-                          Text(
-                            'Posisikan wajah Anda tegak di dalam lingkaran',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10.5.sp,
-                              fontFamily: 'Plus Jakarta Sans',
-                              fontWeight: FontWeight.w500,
+                          SizedBox(width: 5.w),
+                          Flexible(
+                            child: Text(
+                              'Posisikan wajah Anda tegak di dalam lingkaran',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10.sp,
+                                fontFamily: 'Plus Jakarta Sans',
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],
