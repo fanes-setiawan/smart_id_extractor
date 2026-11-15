@@ -34,6 +34,7 @@ export 'ui/ktp_camera_screen.dart';
 export 'ui/smart_document_camera_screen.dart';
 export 'ui/smart_document_stepper_header.dart';
 export 'ui/smart_document_watermark_painter.dart';
+export 'ui/smart_face_camera_screen.dart';
 
 /// A utility class for extracting information from KTP (Indonesian ID card) and Passport images.
 class KtpExtractor {
