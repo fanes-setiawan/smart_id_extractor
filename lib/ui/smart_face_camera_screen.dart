@@ -1,17 +1,16 @@
-// ignore_for_file: deprecated_member_use, use_build_context_synchronously
-
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
 
+import 'package:flutter_svg/flutter_svg.dart';
 import 'custom_snackbar.dart';
 
-/// Status panduan wajah di dalam bingkai foto profil
 enum SmartFaceFrameStatus {
   noFace,
   multipleFaces,
@@ -21,14 +20,6 @@ enum SmartFaceFrameStatus {
   aligned,
 }
 
-/// Layar Kamera Foto Profil Berstandar:
-/// - Desain konsisten persis SmartDocumentCameraScreen (Card Viewfinder rapi di tengah latar #F9F9FF)
-/// - Preview kamera pas di dalam Card rounded tanpa garis potong hitam acak
-/// - Panduan resmi di bawah kartu kamera dengan bullet point & ikon lampu ide
-/// - Shutter button elegan dengan shadow soft amber
-/// - Saat foto berhasil diambil: Card rapi tanpa radius border, tombol Ulangi & Simpan siap pakai
-/// - Validasi ketat: Wajah manusia wajib menghadap lurus ke depan (Euler Angle Y/Z/X)
-/// - Output konsisten: 720 × 720 px (1:1), JPEG Quality 85%, 100–300 KB
 class SmartFaceCameraScreen extends StatefulWidget {
   final String title;
   final String subtitle;
@@ -37,7 +28,7 @@ class SmartFaceCameraScreen extends StatefulWidget {
   const SmartFaceCameraScreen({
     super.key,
     this.title = 'Uji Foto Profil',
-    this.subtitle = 'Pastikan seluruh wajah masuk dalam lingkaran',
+    this.subtitle = 'Posisikan kepala & bahu sesuai siluet',
     this.onPhotoSaved,
   });
 
@@ -52,8 +43,9 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
   int _selectedCameraIndex = 0;
 
   File? _capturedFile;
-  bool _isCameraInitialized = false;
   bool _isProcessingCapture = false;
+  bool _isDetecting = false;
+  DateTime _lastDetectionTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   late final FaceDetector _faceDetector;
 
@@ -75,11 +67,11 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
     WidgetsBinding.instance.addObserver(this);
     _faceDetector = FaceDetector(
       options: FaceDetectorOptions(
-        performanceMode: FaceDetectorMode.accurate,
-        enableLandmarks: true,
-        enableClassification: true,
-        enableTracking: true,
-        minFaceSize: 0.20,
+        performanceMode: FaceDetectorMode.fast,
+        enableLandmarks: false,
+        enableClassification: false,
+        enableTracking: false,
+        minFaceSize: 0.15,
       ),
     );
     _initCamerasAndController();
@@ -89,6 +81,7 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_controller == null || !_controller!.value.isInitialized) return;
     if (state == AppLifecycleState.inactive) {
+      _stopImageStream();
       _controller?.dispose();
     } else if (state == AppLifecycleState.resumed) {
       _initCamerasAndController();
@@ -112,23 +105,191 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
   }
 
   Future<void> _setupCameraController(CameraDescription description) async {
+    await _stopImageStream();
     await _controller?.dispose();
 
     _controller = CameraController(
       description,
       ResolutionPreset.high,
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.jpeg,
+      imageFormatGroup: Platform.isAndroid
+          ? ImageFormatGroup.nv21
+          : ImageFormatGroup.bgra8888,
     );
 
     try {
       await _controller!.initialize();
       if (!mounted) return;
-      setState(() {
-        _isCameraInitialized = true;
-      });
+      setState(() {});
+      _startImageStream();
     } catch (e) {
       debugPrint('Error setting up camera controller: $e');
+    }
+  }
+
+  void _startImageStream() {
+    final controller = _controller;
+    if (controller == null ||
+        !controller.value.isInitialized ||
+        controller.value.isStreamingImages) {
+      return;
+    }
+
+    try {
+      controller.startImageStream((CameraImage image) {
+        _processCameraImage(image);
+      });
+    } catch (e) {
+      debugPrint('Error starting image stream: $e');
+    }
+  }
+
+  Future<void> _stopImageStream() async {
+    final controller = _controller;
+    if (controller != null &&
+        controller.value.isInitialized &&
+        controller.value.isStreamingImages) {
+      try {
+        await controller.stopImageStream();
+      } catch (e) {
+        debugPrint('Error stopping image stream: $e');
+      }
+    }
+  }
+
+  InputImage? _inputImageFromCameraImage(
+    CameraImage image,
+    CameraDescription camera,
+  ) {
+    final sensorOrientation = camera.sensorOrientation;
+    final InputImageRotation? rotation =
+        InputImageRotationValue.fromRawValue(sensorOrientation);
+    if (rotation == null) return null;
+
+    final format = Platform.isAndroid
+        ? InputImageFormat.nv21
+        : InputImageFormat.bgra8888;
+
+    if (Platform.isAndroid && image.planes.length > 1) {
+      final WriteBuffer allBytes = WriteBuffer();
+      for (final Plane plane in image.planes) {
+        allBytes.putUint8List(plane.bytes);
+      }
+      final bytes = allBytes.done().buffer.asUint8List();
+
+      return InputImage.fromBytes(
+        bytes: bytes,
+        metadata: InputImageMetadata(
+          size: Size(image.width.toDouble(), image.height.toDouble()),
+          rotation: rotation,
+          format: format,
+          bytesPerRow: image.planes[0].bytesPerRow,
+        ),
+      );
+    }
+
+    final plane = image.planes.first;
+
+    return InputImage.fromBytes(
+      bytes: plane.bytes,
+      metadata: InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: rotation,
+        format: format,
+        bytesPerRow: plane.bytesPerRow,
+      ),
+    );
+  }
+
+  Future<void> _processCameraImage(CameraImage image) async {
+    if (_isDetecting ||
+        _isProcessingCapture ||
+        _capturedFile != null ||
+        !mounted) {
+      return;
+    }
+
+    final now = DateTime.now();
+    if (now.difference(_lastDetectionTime).inMilliseconds < 200) {
+      return;
+    }
+
+    _isDetecting = true;
+    _lastDetectionTime = now;
+
+    try {
+      if (_availableCameras.isEmpty ||
+          _selectedCameraIndex >= _availableCameras.length) {
+        return;
+      }
+      final camera = _availableCameras[_selectedCameraIndex];
+      final inputImage = _inputImageFromCameraImage(image, camera);
+      if (inputImage == null) return;
+
+      final List<Face> faces = await _faceDetector.processImage(inputImage);
+      if (!mounted || _capturedFile != null || _isProcessingCapture) return;
+
+      if (faces.isEmpty) {
+        if (_frameStatus != SmartFaceFrameStatus.noFace || _isFaceAligned) {
+          setState(() {
+            _frameStatus = SmartFaceFrameStatus.noFace;
+            _isFaceAligned = false;
+          });
+        }
+        return;
+      }
+
+      if (faces.length > 1) {
+        if (_frameStatus != SmartFaceFrameStatus.multipleFaces ||
+            _isFaceAligned) {
+          setState(() {
+            _frameStatus = SmartFaceFrameStatus.multipleFaces;
+            _isFaceAligned = false;
+          });
+        }
+        return;
+      }
+
+      final Face face = faces.first;
+      final double rotY = face.headEulerAngleY ?? 0.0;
+      final double rotZ = face.headEulerAngleZ ?? 0.0;
+      final double rotX = face.headEulerAngleX ?? 0.0;
+
+      if (rotY.abs() > 22.0 || rotZ.abs() > 22.0 || rotX.abs() > 24.0) {
+        if (_frameStatus != SmartFaceFrameStatus.offCenter || _isFaceAligned) {
+          setState(() {
+            _frameStatus = SmartFaceFrameStatus.offCenter;
+            _isFaceAligned = false;
+          });
+        }
+        return;
+      }
+
+      final Rect faceBox = face.boundingBox;
+      final double imgHeight = image.height.toDouble();
+      final double faceCenterYRatio =
+          ((faceBox.top + faceBox.bottom) / 2.0) / imgHeight;
+
+      if (faceCenterYRatio < 0.20 || faceCenterYRatio > 0.75) {
+        if (_frameStatus != SmartFaceFrameStatus.offCenter || _isFaceAligned) {
+          setState(() {
+            _frameStatus = SmartFaceFrameStatus.offCenter;
+            _isFaceAligned = false;
+          });
+        }
+        return;
+      }
+
+      if (_frameStatus != SmartFaceFrameStatus.aligned || !_isFaceAligned) {
+        setState(() {
+          _frameStatus = SmartFaceFrameStatus.aligned;
+          _isFaceAligned = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error processing camera stream: $e');
+    } finally {
+      _isDetecting = false;
     }
   }
 
@@ -143,7 +304,8 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
     if (_controller == null ||
         !_controller!.value.isInitialized ||
         _controller!.value.isTakingPicture ||
-        _isProcessingCapture) {
+        _isProcessingCapture ||
+        !_isFaceAligned) {
       return;
     }
 
@@ -152,90 +314,106 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
     });
 
     try {
+      await _stopImageStream();
       final XFile picture = await _controller!.takePicture();
       final File rawFile = File(picture.path);
 
-      // 1. Validasi Keberadaan Wajah
       final inputImage = InputImage.fromFilePath(rawFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
 
       if (faces.isEmpty) {
-        showCustomSnackBar(
-          context,
-          'Wajah tidak terdeteksi. Posisikan wajah Anda tepat di dalam lingkaran.',
-        );
-        setState(() {
-          _frameStatus = SmartFaceFrameStatus.noFace;
-          _isFaceAligned = false;
-        });
+        if (mounted) {
+          showCustomSnackBar(
+            context,
+            'Wajah tidak terdeteksi. Posisikan wajah tepat di dalam lingkaran.',
+          );
+          setState(() {
+            _frameStatus = SmartFaceFrameStatus.noFace;
+            _isFaceAligned = false;
+          });
+          _startImageStream();
+        }
         return;
       }
 
       if (faces.length > 1) {
-        showCustomSnackBar(
-          context,
-          'Terdeteksi lebih dari satu wajah. Pastikan hanya ada 1 orang di frame.',
-        );
-        setState(() {
-          _frameStatus = SmartFaceFrameStatus.multipleFaces;
-          _isFaceAligned = false;
-        });
+        if (mounted) {
+          showCustomSnackBar(
+            context,
+            'Terdeteksi lebih dari satu orang. Pastikan hanya ada 1 orang di frame.',
+          );
+          setState(() {
+            _frameStatus = SmartFaceFrameStatus.multipleFaces;
+            _isFaceAligned = false;
+          });
+          _startImageStream();
+        }
         return;
       }
 
       final Face face = faces.first;
       final Rect faceBox = face.boundingBox;
 
-      // 2. Validasi Ketat Sudut Rotasi Kepala (Wajib Menghadap Lurus ke Depan)
       final double rotY = face.headEulerAngleY ?? 0.0;
       final double rotZ = face.headEulerAngleZ ?? 0.0;
       final double rotX = face.headEulerAngleX ?? 0.0;
 
-      if (rotY.abs() > 12.0) {
-        showCustomSnackBar(
-          context,
-          'Wajah harus menghadap lurus ke depan. Jangan menoleh ke samping.',
-        );
-        setState(() {
-          _frameStatus = SmartFaceFrameStatus.offCenter;
-          _isFaceAligned = false;
-        });
+      if (rotY.abs() > 22.0) {
+        if (mounted) {
+          showCustomSnackBar(
+            context,
+            'Wajah harus menghadap lurus ke depan. Jangan menoleh ke samping.',
+          );
+          setState(() {
+            _frameStatus = SmartFaceFrameStatus.offCenter;
+            _isFaceAligned = false;
+          });
+          _startImageStream();
+        }
         return;
       }
 
-      if (rotZ.abs() > 14.0) {
-        showCustomSnackBar(
-          context,
-          'Posisi kepala miring. Tegakkan kepala menghadap kamera.',
-        );
-        setState(() {
-          _frameStatus = SmartFaceFrameStatus.offCenter;
-          _isFaceAligned = false;
-        });
+      if (rotZ.abs() > 22.0) {
+        if (mounted) {
+          showCustomSnackBar(
+            context,
+            'Posisi kepala miring. Tegakkan kepala menghadap kamera.',
+          );
+          setState(() {
+            _frameStatus = SmartFaceFrameStatus.offCenter;
+            _isFaceAligned = false;
+          });
+          _startImageStream();
+        }
         return;
       }
 
-      if (rotX.abs() > 16.0) {
-        showCustomSnackBar(
-          context,
-          'Arahkan pandangan sejajar dengan kamera (tidak terlalu mendongak/menunduk).',
-        );
-        setState(() {
-          _frameStatus = SmartFaceFrameStatus.offCenter;
-          _isFaceAligned = false;
-        });
+      if (rotX.abs() > 24.0) {
+        if (mounted) {
+          showCustomSnackBar(
+            context,
+            'Arahkan pandangan sejajar dengan kamera (tidak terlalu mendongak/menunduk).',
+          );
+          setState(() {
+            _frameStatus = SmartFaceFrameStatus.offCenter;
+            _isFaceAligned = false;
+          });
+          _startImageStream();
+        }
         return;
       }
 
-      // 3. Decode & Orientasi EXIF
       final rawBytes = await rawFile.readAsBytes();
       img.Image? originalImage = img.decodeImage(rawBytes);
 
       if (originalImage == null) {
-        showCustomSnackBar(
-          context,
-          'Gagal memproses gambar. Silakan coba lagi.',
-        );
+        if (mounted) {
+          showCustomSnackBar(
+            context,
+            'Gagal memproses gambar. Silakan coba lagi.',
+          );
+          _startImageStream();
+        }
         return;
       }
 
@@ -244,55 +422,28 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
       final int imgWidth = originalImage.width;
       final int imgHeight = originalImage.height;
 
-      // 4. Validasi Proporsi Wajah
-      final double minDimension = math.min(imgWidth, imgHeight).toDouble();
-      final double faceDimension = math.max(faceBox.width, faceBox.height);
-      final double faceRatio = faceDimension / minDimension;
+      final double faceCenterYRatio =
+          ((faceBox.top + faceBox.bottom) / 2.0) / imgHeight.toDouble();
 
+      if (faceCenterYRatio < 0.20 || faceCenterYRatio > 0.75) {
+        if (mounted) {
+          showCustomSnackBar(
+            context,
+            'Posisikan wajah di bagian kepala siluet (bukan di dada).',
+          );
+          setState(() {
+            _frameStatus = SmartFaceFrameStatus.offCenter;
+            _isFaceAligned = false;
+          });
+          _startImageStream();
+        }
+        return;
+      }
+
+      final double faceDimension = math.max(faceBox.width, faceBox.height);
       final double faceCenterX = (faceBox.left + faceBox.right) / 2.0;
       final double faceCenterY = (faceBox.top + faceBox.bottom) / 2.0;
-      final double relOffsetX =
-          (faceCenterX - (imgWidth / 2.0)).abs() / (imgWidth / 2.0);
-      final double relOffsetY =
-          (faceCenterY - (imgHeight * 0.44)).abs() / (imgHeight * 0.44);
 
-      if (faceRatio < 0.20) {
-        showCustomSnackBar(
-          context,
-          'Posisi wajah terlalu jauh. Dekatkan wajah Anda ke kamera.',
-        );
-        setState(() {
-          _frameStatus = SmartFaceFrameStatus.tooFar;
-          _isFaceAligned = false;
-        });
-        return;
-      }
-
-      if (faceRatio > 0.88) {
-        showCustomSnackBar(
-          context,
-          'Posisi wajah terlalu dekat. Jauhkan sedikit wajah Anda.',
-        );
-        setState(() {
-          _frameStatus = SmartFaceFrameStatus.tooClose;
-          _isFaceAligned = false;
-        });
-        return;
-      }
-
-      if (relOffsetX > 0.38 || relOffsetY > 0.45) {
-        showCustomSnackBar(
-          context,
-          'Posisikan wajah tepat di tengah lingkaran.',
-        );
-        setState(() {
-          _frameStatus = SmartFaceFrameStatus.offCenter;
-          _isFaceAligned = false;
-        });
-        return;
-      }
-
-      // 5. Potong Persegi 1:1 Berpusat pada Wajah
       final int cropSize = math.min(
         imgWidth,
         (faceDimension * 1.85).round().clamp(300, math.min(imgWidth, imgHeight)),
@@ -316,7 +467,6 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
         croppedImage = img.flipHorizontal(croppedImage);
       }
 
-      // 6. Standarisasi Output: 720 × 720 px, JPEG Quality 85%
       img.Image resizedImage = img.copyResize(
         croppedImage,
         width: 720,
@@ -337,17 +487,22 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
         }
       } catch (_) {}
 
-      setState(() {
-        _capturedFile = processedFile;
-        _isFaceAligned = true;
-        _frameStatus = SmartFaceFrameStatus.aligned;
-      });
+      if (mounted) {
+        setState(() {
+          _capturedFile = processedFile;
+          _isFaceAligned = true;
+          _frameStatus = SmartFaceFrameStatus.aligned;
+        });
+      }
     } catch (e) {
       debugPrint('Error capturing face image: $e');
-      showCustomSnackBar(
-        context,
-        'Terjadi kendala saat memproses foto. Silakan coba lagi.',
-      );
+      if (mounted) {
+        showCustomSnackBar(
+          context,
+          'Terjadi kendala saat memproses foto. Silakan coba lagi.',
+        );
+        _startImageStream();
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -360,6 +515,7 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _stopImageStream();
     _controller?.dispose();
     _faceDetector.close();
     super.dispose();
@@ -373,10 +529,8 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. Top Bar Konsisten
             _buildTopBar(),
 
-            // 2. Area Konten Tengah
             Expanded(
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
@@ -386,19 +540,16 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
                   children: [
                     SizedBox(height: 6.h),
 
-                    // 3. Viewfinder Card Elegan (Rapi, Konsisten dengan Dokumen)
                     _buildFaceViewfinderCard(),
 
                     SizedBox(height: 16.h),
 
-                    // 4. Kartu Panduan Foto Profil (Sesuai Style Resmi)
                     _buildGuidanceCard(),
                   ],
                 ),
               ),
             ),
 
-            // 5. Bottom Action Bar
             Container(
               color: Colors.transparent,
               padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 16.h),
@@ -456,10 +607,26 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
     );
   }
 
+  String get _guidancePillText {
+    switch (_frameStatus) {
+      case SmartFaceFrameStatus.aligned:
+        return 'Wajah pas, silakan ambil foto';
+      case SmartFaceFrameStatus.offCenter:
+        return 'Posisikan wajah di bagian kepala siluet';
+      case SmartFaceFrameStatus.tooFar:
+        return 'Dekatkan wajah Anda ke kamera';
+      case SmartFaceFrameStatus.tooClose:
+        return 'Jauhkan sedikit wajah Anda';
+      case SmartFaceFrameStatus.multipleFaces:
+        return 'Pastikan hanya ada 1 orang di frame';
+      case SmartFaceFrameStatus.noFace:
+        return 'Posisikan kepala & bahu sesuai siluet';
+    }
+  }
+
   Widget _buildFaceViewfinderCard() {
     final double cardWidth = 345.w;
-    // Saat review hasil (1:1), buat card tepat persegi (1:1) agar foto memenuhi container tanpa sisa padding
-    final double cardHeight = _capturedFile != null ? cardWidth : cardWidth * 1.15;
+    final double cardHeight = _capturedFile != null ? cardWidth : cardWidth * 1.18;
 
     return Center(
       child: Container(
@@ -470,7 +637,7 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
           borderRadius: BorderRadius.circular(20.r),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF002245).withOpacity(0.08),
+              color: const Color(0xFF002245).withValues(alpha: 0.08),
               blurRadius: 16.r,
               offset: Offset(0, 4.h),
             ),
@@ -481,7 +648,6 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // 1. Live Camera Preview saat belum ada foto
               if (_capturedFile == null &&
                   _controller != null &&
                   _controller!.value.isInitialized)
@@ -500,7 +666,6 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
                   ),
                 ),
 
-              // 2. Hasil Foto (Memenuhi card 1:1 secara penuh, tajam, dan proporsional tanpa gap)
               if (_capturedFile != null)
                 Image.file(
                   _capturedFile!,
@@ -509,51 +674,77 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
                   height: cardHeight,
                 ),
 
-              // 3. Circle Face Frame Overlay (Hanya saat memotret)
               if (_capturedFile == null)
-                CustomPaint(
-                  size: Size.infinite,
-                  painter: CleanCircleFaceFramePainter(
-                    isAligned: _isFaceAligned,
-                    status: _frameStatus,
+                IgnorePointer(
+                  child: Center(
+                    child: ColorFiltered(
+                      colorFilter: ColorFilter.mode(
+                        _isFaceAligned
+                            ? const Color(0xFF10B981)
+                            : (_frameStatus == SmartFaceFrameStatus.offCenter ||
+                                    _frameStatus == SmartFaceFrameStatus.tooFar ||
+                                    _frameStatus == SmartFaceFrameStatus.tooClose)
+                                ? const Color(0xFFFD990F)
+                                : Colors.white.withValues(alpha: 0.88),
+                        BlendMode.srcIn,
+                      ),
+                      child: Transform.translate(
+                        offset: Offset(0, 52.h),
+                        child: Transform.scale(
+                          scale: 1.18,
+                          alignment: Alignment.bottomCenter,
+                          child: SvgPicture.asset(
+                            'assets/icons/frame.svg',
+                            package: 'smart_id_extractor',
+                            fit: BoxFit.contain,
+                            width: cardWidth,
+                            height: cardHeight,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
 
-              // 4. Pill Petunjuk Bawah di dalam Card Viewfinder
               if (_capturedFile == null)
                 Positioned(
                   bottom: 12.h,
                   left: 12.w,
                   right: 12.w,
                   child: Center(
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
                       padding: EdgeInsets.symmetric(
-                        horizontal: 10.w,
+                        horizontal: 12.w,
                         vertical: 6.h,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.60),
+                        color: _isFaceAligned
+                            ? const Color(0xFF10B981).withValues(alpha: 0.85)
+                            : Colors.black.withValues(alpha: 0.65),
                         borderRadius: BorderRadius.circular(20.r),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.crop_free_rounded,
+                            _isFaceAligned
+                                ? Icons.check_circle_rounded
+                                : Icons.crop_free_rounded,
                             color: Colors.white,
                             size: 14.sp,
                           ),
                           SizedBox(width: 5.w),
                           Flexible(
                             child: Text(
-                              'Posisikan wajah Anda tegak di dalam lingkaran',
+                              _guidancePillText,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 10.sp,
+                                fontSize: 10.5.sp,
                                 fontFamily: 'Plus Jakarta Sans',
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -563,10 +754,9 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
                   ),
                 ),
 
-              // 5. Spinner saat memproses
               if (_isProcessingCapture)
                 Container(
-                  color: Colors.black.withOpacity(0.40),
+                  color: Colors.black.withValues(alpha: 0.40),
                   child: Center(
                     child: Container(
                       width: 68.r,
@@ -626,9 +816,9 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
             ],
           ),
           SizedBox(height: 10.h),
+          _buildGuidelineItem('Posisikan kepala, telinga, leher, dan bahu sejajar dengan garis siluet.'),
           _buildGuidelineItem('Wajah wajib menghadap lurus ke depan kamera (tidak menoleh atau miring).'),
-          _buildGuidelineItem('Pastikan pencahayaan cukup terang dan tidak membelakangi cahaya (backlight).'),
-          _buildGuidelineItem('Posisikan wajah pas di dalam lingkaran hingga indikator berubah hijau.'),
+          _buildGuidelineItem('Pastikan pencahayaan cukup terang dan posisikan wajah di area kepala hingga garis siluet berubah hijau.'),
         ],
       ),
     );
@@ -667,28 +857,38 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
   }
 
   Widget _buildShutterButton() {
+    final bool isEnabled = _isFaceAligned && !_isProcessingCapture;
+
     return Center(
       child: GestureDetector(
-        onTap: _takePictureAndVerify,
-        child: Container(
+        onTap: isEnabled ? _takePictureAndVerify : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
           width: 72.w,
           height: 72.w,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFFFD990F).withOpacity(0.18),
+            color: isEnabled
+                ? const Color(0xFFFD990F).withValues(alpha: 0.18)
+                : const Color(0xFFE2E8F0).withValues(alpha: 0.50),
           ),
           padding: EdgeInsets.all(6.w),
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFFFD990F),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFFD990F).withOpacity(0.40),
-                  blurRadius: 14.r,
-                  offset: Offset(0, 4.h),
-                ),
-              ],
+              color: isEnabled
+                  ? const Color(0xFFFD990F)
+                  : const Color(0xFFCBD5E1),
+              boxShadow: isEnabled
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFFD990F).withValues(alpha: 0.40),
+                        blurRadius: 14.r,
+                        offset: Offset(0, 4.h),
+                      ),
+                    ]
+                  : [],
             ),
             child: Icon(
               Icons.camera_alt_rounded,
@@ -704,7 +904,6 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
   Widget _buildReviewControls() {
     return Row(
       children: [
-        // Tombol Ulangi
         Expanded(
           child: SizedBox(
             height: 48.h,
@@ -715,6 +914,7 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
                   _frameStatus = SmartFaceFrameStatus.noFace;
                   _isFaceAligned = false;
                 });
+                _startImageStream();
               },
               icon: Icon(Icons.refresh_rounded,
                   size: 20.sp, color: const Color(0xFF0B3866)),
@@ -728,32 +928,26 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
+                side: const BorderSide(color: Color(0xFF0B3866), width: 1.5),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14.r),
+                  borderRadius: BorderRadius.circular(12.r),
                 ),
               ),
             ),
           ),
         ),
-        SizedBox(width: 14.w),
-
-        // Tombol Simpan
+        SizedBox(width: 12.w),
         Expanded(
           child: SizedBox(
             height: 48.h,
             child: ElevatedButton.icon(
               onPressed: () {
-                if (widget.onPhotoSaved != null) {
-                  widget.onPhotoSaved!(_capturedFile!);
+                if (_capturedFile != null) {
+                  widget.onPhotoSaved?.call(_capturedFile!);
+                  Navigator.pop(context, _capturedFile);
                 }
-                Navigator.pop(context, _capturedFile);
               },
-              icon: const Icon(
-                Icons.check_circle_outline_rounded,
-                size: 20,
-                color: Colors.white,
-              ),
+              icon: Icon(Icons.check_rounded, size: 20.sp, color: Colors.white),
               label: Text(
                 'Simpan',
                 style: TextStyle(
@@ -764,124 +958,16 @@ class _SmartFaceCameraScreenState extends State<SmartFaceCameraScreen>
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFD990F),
-                elevation: 0,
-                shadowColor: Colors.transparent,
+                backgroundColor: const Color(0xFF0B3866),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14.r),
+                  borderRadius: BorderRadius.circular(12.r),
                 ),
+                elevation: 0,
               ),
             ),
           ),
         ),
       ],
     );
-  }
-}
-
-/// Custom painter: Lingkaran hijau bersih dan 4 corner brackets presisi di dalam viewfinder
-class CleanCircleFaceFramePainter extends CustomPainter {
-  final bool isAligned;
-  final SmartFaceFrameStatus status;
-
-  CleanCircleFaceFramePainter({
-    required this.isAligned,
-    required this.status,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.width == 0 || size.height == 0) return;
-
-    final Offset center = Offset(size.width / 2.0, size.height * 0.46);
-    final double radius = size.width * 0.35;
-
-    // 1. Scrim gelap tipis di luar lingkaran
-    final backgroundPath = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    final circleHolePath = Path()
-      ..addOval(Rect.fromCircle(center: center, radius: radius));
-    final transparentHole = Path.combine(
-      PathOperation.difference,
-      backgroundPath,
-      circleHolePath,
-    );
-
-    final scrimPaint = Paint()
-      ..color = Colors.black.withOpacity(0.40)
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(transparentHole, scrimPaint);
-
-    // 2. Garis Lingkaran Hijau/Amber
-    final Color circleColor = isAligned
-        ? const Color(0xFF10B981)
-        : (status == SmartFaceFrameStatus.offCenter ||
-                status == SmartFaceFrameStatus.tooFar ||
-                status == SmartFaceFrameStatus.tooClose)
-            ? const Color(0xFFFD990F)
-            : const Color(0xFF10B981);
-
-    final circlePaint = Paint()
-      ..color = circleColor
-      ..strokeWidth = 3.2
-      ..style = PaintingStyle.stroke;
-    canvas.drawCircle(center, radius, circlePaint);
-
-    // 3. Empat Corner Brackets
-    final cornerPaint = Paint()
-      ..color = Colors.white.withOpacity(0.85)
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final double boxSize = radius * 2.30;
-    final Rect bracketRect = Rect.fromCenter(
-      center: center,
-      width: boxSize,
-      height: boxSize,
-    );
-    const double armLength = 22.0;
-    const double cornerRadius = 8.0;
-
-    // Top-Left
-    final tl = Path()
-      ..moveTo(bracketRect.left, bracketRect.top + armLength)
-      ..lineTo(bracketRect.left, bracketRect.top + cornerRadius)
-      ..quadraticBezierTo(bracketRect.left, bracketRect.top,
-          bracketRect.left + cornerRadius, bracketRect.top)
-      ..lineTo(bracketRect.left + armLength, bracketRect.top);
-    canvas.drawPath(tl, cornerPaint);
-
-    // Top-Right
-    final tr = Path()
-      ..moveTo(bracketRect.right - armLength, bracketRect.top)
-      ..lineTo(bracketRect.right - cornerRadius, bracketRect.top)
-      ..quadraticBezierTo(bracketRect.right, bracketRect.top,
-          bracketRect.right, bracketRect.top + cornerRadius)
-      ..lineTo(bracketRect.right, bracketRect.top + armLength);
-    canvas.drawPath(tr, cornerPaint);
-
-    // Bottom-Left
-    final bl = Path()
-      ..moveTo(bracketRect.left, bracketRect.bottom - armLength)
-      ..lineTo(bracketRect.left, bracketRect.bottom - cornerRadius)
-      ..quadraticBezierTo(bracketRect.left, bracketRect.bottom,
-          bracketRect.left + cornerRadius, bracketRect.bottom)
-      ..lineTo(bracketRect.left + armLength, bracketRect.bottom);
-    canvas.drawPath(bl, cornerPaint);
-
-    // Bottom-Right
-    final br = Path()
-      ..moveTo(bracketRect.right - armLength, bracketRect.bottom)
-      ..lineTo(bracketRect.right - cornerRadius, bracketRect.bottom)
-      ..quadraticBezierTo(bracketRect.right, bracketRect.bottom,
-          bracketRect.right, bracketRect.bottom - cornerRadius)
-      ..lineTo(bracketRect.right, bracketRect.bottom - armLength);
-    canvas.drawPath(br, cornerPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CleanCircleFaceFramePainter oldDelegate) {
-    return oldDelegate.isAligned != isAligned || oldDelegate.status != status;
   }
 }
