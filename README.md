@@ -16,12 +16,26 @@ An intelligent, high-accuracy Flutter OCR and on-device machine learning library
   - Returns structured `KartuKeluargaModel` with validation confidence score, failure reason diagnostics, and key fields.
 - 📷 **Smart Live Camera Screen**:
   - Real-time card boundary detection with smooth flexible animated overlay frame.
-  - Customizable UI: toggle gallery picker (`enableGalleryPicker`), custom accent/loading colors (`loadingColor`), and real-time guidance text.
+  - Customizable UI: toggle gallery picker (`enableGallery`), custom accent/loading colors (`loadingColor`), and real-time guidance text.
   - Automatic perspective crop using on-device machine learning model.
+- 👤 **Smart Face Camera (Profile Verification)**:
+  - Clean head & ears silhouette guidance frame.
+  - Live face detection with pose angle validation (Euler X/Y/Z) to ensure frontal alignment.
+  - Automatic 1:1 square crop (720x720 px, JPEG 85%) for profile/biometric records.
+- 📄 **Multi-Document Flow Support**:
+  - Step-by-step document guidance (KTP, SIM, Surat Sehat, Paspor) with custom watermarks, status badges, and expandable guidelines.
 - 🛂 **Passport MRZ Extraction**:
   - Extracts Machine Readable Zone (MRZ - TD3 standard) data with check digit verification.
   - Extracts passport number, issuing country, nationality, surname, given names, date of birth, expiration date, and gender.
 - ⚡ **Offline & Private**: Fully on-device processing using Google ML Kit and TensorFlow Lite without sending sensitive identity documents to third-party servers.
+
+---
+
+## 📸 Screenshots & Showcase
+
+| KTP Scanner & Frame | KTP Extraction Result | Face Camera with Guide | Document Step Flow |
+|:---:|:---:|:---:|:---:|
+| <img src="https://raw.githubusercontent.com/fanes-setiawan/smart_id_extractor/main/screenshots/ktp_scanner.jpg" width="200" alt="KTP Scanner"/> | <img src="https://raw.githubusercontent.com/fanes-setiawan/smart_id_extractor/main/screenshots/ktp_result.jpg" width="200" alt="KTP Result"/> | <img src="https://raw.githubusercontent.com/fanes-setiawan/smart_id_extractor/main/screenshots/face_camera.jpg" width="200" alt="Face Camera"/> | <img src="https://raw.githubusercontent.com/fanes-setiawan/smart_id_extractor/main/screenshots/document_stepper.jpg" width="200" alt="Document Stepper"/> |
 
 ---
 
