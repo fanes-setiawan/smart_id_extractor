@@ -1003,7 +1003,11 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                               SizedBox(height: 12.h),
                               ElevatedButton(
                                 onPressed: () {
-                                  _initCamera(manualRetry: true);
+                                  if (_cameraPermissionPermanentlyDenied) {
+                                    openAppSettings();
+                                  } else {
+                                    _initCamera(manualRetry: true);
+                                  }
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFFD990F),
@@ -1015,7 +1019,9 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
                                   ),
                                 ),
                                 child: Text(
-                                  'Coba Lagi',
+                                  _cameraPermissionPermanentlyDenied
+                                      ? 'Buka Pengaturan'
+                                      : 'Coba Lagi',
                                   style: TextStyle(
                                     fontFamily: 'Plus Jakarta Sans',
                                     fontSize: 11.5.sp,
