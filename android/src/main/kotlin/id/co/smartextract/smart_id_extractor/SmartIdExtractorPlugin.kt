@@ -1,4 +1,4 @@
-package com.irfan.smart_id_extractor
+package id.co.smartextract.smart_id_extractor
 
 import androidx.annotation.NonNull
 
