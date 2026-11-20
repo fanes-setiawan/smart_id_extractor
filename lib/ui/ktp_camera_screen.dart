@@ -31,7 +31,7 @@ class KtpCameraScreen extends StatefulWidget {
   /// Subtitle or instruction line below title.
   final String? subtitle;
 
-  /// Header title for the screen. Defaults to 'SMART INDOPSIKO - OCR -KTP'.
+  /// Header title for the screen. Defaults to 'KTP - OCR SCANNER'.
   final String headerTitle;
 
   /// Whether to show the gallery picker button allowing the user to select an image from the gallery.
@@ -53,7 +53,7 @@ class KtpCameraScreen extends StatefulWidget {
     this.focusHoldDurationMs = 1300,
     this.title,
     this.subtitle,
-    this.headerTitle = 'SMART INDOPSIKO - OCR -KTP',
+    this.headerTitle = 'KTP - OCR SCANNER',
     this.enableGallery = true,
     this.loadingColor = const Color(0xFFF59E0B),
     this.onManualInput,
@@ -1073,7 +1073,7 @@ class _KtpCameraScreenState extends State<KtpCameraScreen>
                             ),
                             SizedBox(width: 5.w),
                             Text(
-                              'KEBIJAKAN PRIVASI INDOPSIKO',
+                              'KEBIJAKAN PRIVASI',
                               style: TextStyle(
                                 fontFamily: 'Plus Jakarta Sans',
                                 color: const Color(0xFF43474F),

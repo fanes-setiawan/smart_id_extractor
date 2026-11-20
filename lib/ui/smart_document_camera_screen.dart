@@ -442,7 +442,7 @@ class _SmartDocumentCameraScreenState extends State<SmartDocumentCameraScreen>
       if (!widget.showSubmitButton) {
         _returnResult(result);
       } else if (!result.isValid) {
-        // Show validation snackbar using exact styling from app-mobile-smartindopsiko
+        // Show validation snackbar
         showCustomSnackBar(
           context,
           result.errorMessage ?? 'Foto yang Anda unggah tidak valid.',
